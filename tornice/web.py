@@ -68,79 +68,9 @@ def request_handler_def(path, handler_func, methods=None, fields=None, proto=Non
     module_routes.add_spec(fullpath, handler_class, None)
 
 
+from tornado.log import access_log
+import mimetypes
 
-
-class StaticFileHandler(tornado.web.StaticFileHandler):
-    '''read static files from folder.
-
-    '''
-    
-    def initialize(self, folder, index_file=None, default_path=None, debug=True):
-        self.root         = folder
-        self.debug        = debug
-        self.index_file   = index_file or 'index.html'
-        self.default_path = default_path or '/index.html'
-
-    def set_extra_headers(self, path):
-        if self.debug:
-            self.set_header("Cache-control", "no-cache")
-
-    def get_content_type(self):
-        """补充已知文件类型的字符编码，确定为UTF-8"""
-        mime_type, encoding = mimetypes.guess_type(self.absolute_path)
-        if encoding is None and mime_type in ('text/html', 'text/css',
-                                              'application/javascript'
-                                              ):
-            mime_type = mime_type +  '; charset=UTF-8'
-        return mime_type
-        
-    def validate_absolute_path(self, root, absolute_path):
-        """overload this method to handle default rule"""
-
-        print(root, absolute_path)
-        return
-
-        root = os.path.abspath(root)
-        # os.path.abspath strips a trailing /
-        # it needs to be temporarily added back for requests to root/
-        if not (absolute_path + os.path.sep).startswith(root):
-            raise tornado.web.HTTPError(403, "%s is not in root static directory",
-                            self.path)
-            
-        if (os.path.isdir(absolute_path) and self.default is not None):
-            # need to look at the request.path here for when path is empty
-            # but there is some prefix to the path that was already
-            # trimmed by the routing
-            if not self.request.path.endswith("/"):
-                self.redirect(self.request.path + "/", permanent=True)
-                return
-            absolute_path = os.path.join(absolute_path, self.default)
-
-        if os.path.exists(absolute_path):
-            if os.path.isfile(absolute_path):
-                return absolute_path
-            else:
-                msg = "it is not a file: '%s' '%s' " % (absolute_path, self.path)
-                raise HTTPError(403, msg)
-
-        
-        final_path = os.path.join(root, self.default)
-        if mimetypes.guess_type(absolute_path)[0]:
-            raise HTTPError(404) # It's concret file, which has mime type
-
-        if not os.path.exists(final_path):
-            raise HTTPError(404) 
-        
-        if not os.path.isfile(final_path):
-            raise HTTPError(403, "%s is not a file", self.path)
-        
-        _logger.info("redirect: '%s' => '%s'", self.path, final_path)
-        
-        return final_path
-    
-    @classmethod
-    def format_class(cls):
-        return str(cls)
 
 def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
 
@@ -150,7 +80,7 @@ def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
 
     def handler_wrapper(serv_func, qry_fields):
         def handler(self, **kwargs):
-            kwargs.update([('request', self)])
+            kwargs.update([('handler', self)])
             kwargs.update([(n, self.get_argument(n, None)) for n in qry_fields])
 
             try:
@@ -218,8 +148,9 @@ class TorniceRoutes:
 
 class WebApp:
 
-    def __init__(self, app_name=None):
+    def __init__(self, **settings):
         self._request_handlers = []
+        self.settings = settings
 
         # add handlers defined in the module where the WebApp object are created
         routes = _get_module_routes(inspect.currentframe().f_back)
@@ -227,7 +158,7 @@ class WebApp:
             self._request_handlers.append((path, handler, settings))  
     
     
-    def add_static_handler(self, url_path, folder=None, index_file='index.html', default_path=None):
+    def add_static_handler(self, url_path, folder=None, index='index.html', default=None):
         """
 
         :param static_folder:
@@ -238,11 +169,11 @@ class WebApp:
         """
 
         routes = self._request_handlers
-        settings = dict(folder        = folder, 
-                        index_file    = index_file, 
-                        default_path  = default_path)
+        params = dict(folder        = folder, 
+                      index_file    = index, 
+                      default_path  = default)
 
-        routes.append((url_path, StaticFileHandler, settings))
+        routes.append((url_path, StaticFileHandler, params))
 
 
     def add_handler_module(self, pkg_or_module, submodules=True):
@@ -251,7 +182,12 @@ class WebApp:
             for path, handler, settings in module._tornice_routes.handlers:
                 self._request_handlers.append((path, handler, settings))   
 
-    def make(self):
+    def setup(self):
+        """setup web application"""
+        
+        torapp = tornado.web.Application(self._request_handlers, **self.settings)
+        torapp.listen(self.settings['port'])
+
         for url_ptn, handler, settings  in self._request_handlers: 
             print(url_ptn, handler.format_class(), settings)
 
@@ -265,6 +201,80 @@ def _get_module_routes(obj):
         module_routes = func_module._tornice_routes
 
     return module_routes
+
+class StaticFileHandler(tornado.web.StaticFileHandler):
+    '''read static files from folder.
+
+    :param index_file:   The index file of folder
+    :param default_path: Redirect to default path 
+                         if path be inaccessible and the mime type of 
+                         path are same with default_path
+    '''
+    
+    def initialize(self, folder, index_file='index.html', default_path=None, debug=True):
+        self.root         = folder
+        self.debug        = debug
+        self.index_file   = index_file
+        self.default_path = default_path
+
+    def set_extra_headers(self, path):
+        if self.debug:
+            self.set_header("Cache-control", "no-cache")
+
+    text_mimetypes = ('text/html','text/css','application/javascript')
+    
+    def get_content_type(self):
+        """make sure the default encoding is UTF-8"""
+        mimetype, encoding = mimetypes.guess_type(self.absolute_path)
+
+        if encoding is None and mimetype in self.text_mimetypes :
+            mimetype = mimetype +  '; charset=UTF-8'
+
+        return mimetype
+        
+    def validate_absolute_path(self, root_folder, absolute_path):
+        """overload this method to handle default rule"""
+
+        root_folder = os.path.abspath(root_folder)
+        if not absolute_path.startswith(root_folder):
+            errmsg = "%s is not in root_folder static directory" % self.path
+            raise tornado.web.HTTPError(403, errmsg)
+        
+        if (os.path.isdir(absolute_path) and self.index_file is not None):
+            if not self.request.path.endswith("/"):
+                # if the path is folder, the path should end with '/'.
+                self.redirect(self.request.path + "/", permanent=True)
+                return
+            absolute_path = os.path.join(absolute_path, self.index_file)
+
+        if os.path.exists(absolute_path):
+            if os.path.isfile(absolute_path):
+                return absolute_path
+            else:
+                msg = "it is not a file: '%s' '%s' " % (absolute_path, self.path)
+                raise tornado.web.HTTPError(403, msg)
+
+        if self.request.path == self.default_path: # default_path does exists
+            errmsg = 'NOT FOUND: default_path[%s]: %s ' 
+            errmsg %= (self.default_path, absolute_path)
+            access_log.warn(errmsg)
+            raise tornado.web.HTTPError(404)
+
+        if self.default_path is not None:
+            guess_mimetype = lambda path : mimetypes.guess_type(path)[0]
+
+            abs_default_path = os.path.join(root_folder, self.default_path)
+            abs_default_path = os.path.abspath(abs_default_path)
+
+            if guess_mimetype(abs_default_path) == guess_mimetype(absolute_path) :
+                # redirect if the mime type of path are same with default_path 
+                self.redirect(self.default_path)
+        else:
+            raise tornado.web.HTTPError(404)
+
+    @classmethod
+    def format_class(cls):
+        return str(cls)
 
 
 def _arg_elem_or_list(arg):
