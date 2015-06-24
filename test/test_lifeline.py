@@ -4,7 +4,7 @@ import unittest
 
 
 
-from tornice.lifeline import Lifeline, History, LifelineError
+from tornice.lifeline import Lifeline, History, LifelineError, NoBoundObjectError
 
 
 
@@ -22,9 +22,7 @@ class TestLifeline(unittest.TestCase):
                     self.assertTrue(bool(a))
                     self.assertEqual(len(a), 4)
                     nonlocal a
-                    print(a)
                     a += ['a']
-                    print(a)
                     self.assertIsInstance(a, Lifeline)
                     self.assertEqual(a[1:], [2,3,4, 'a'])
                     print(303, a)
@@ -43,6 +41,9 @@ class TestLifeline(unittest.TestCase):
                 self.assertEqual(a._this_object, 'A')
                 
             print(100, str(a), str(b))
+            self.assertIsNone(a._this_object)
+            with self.assertRaises(NoBoundObjectError):
+                len(a)
 
         f1()        
 

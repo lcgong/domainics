@@ -62,6 +62,9 @@ class History:
 class LifelineError(Exception):
     pass
 
+class NoBoundObjectError(LifelineError):
+    pass
+
 class _Confine:
 
     def __init__(self, stack, *bindings):
@@ -90,12 +93,16 @@ class _Confine:
 def _make_func_proxy(name):
     def invoke(self, *args, **kw):
         obj = _get_this_object(self, sys._getframe(1))
+        if obj is None:
+            raise NoBoundObjectError('id=' + str(id(self)))
         return getattr(obj, name)(*args, **kw)
     return invoke
 
 def _make_ioptr_proxy(name):
     def optr(self, *args, **kw):
         obj = _get_this_object(self, sys._getframe(1))
+        if obj is None:
+            raise NoBoundObjectError('id=' + str(id(self)))
         getattr(obj, name)(*args, **kw)
         return self
     return optr
@@ -138,11 +145,13 @@ class Lifeline(object):
         obj   = _get_this_object(self, sys._getframe(1))
         return '%s(id=%r, this_object=%r)' % (cls.__name__, id(self), obj)
 
-    def __nonzero__(self):
-        return bool(_get_this_object(self, sys._getframe(1)))
+    # def __nonzero__(self):
+    #     return bool(_get_this_object(self, sys._getframe(1)))
 
     def __delattr__(self, name):
         delattr(_get_this_object(self, sys._getframe(1)), name)
+
+    __len__         = _make_func_proxy('__len__')
 
     __iter__        = _make_func_proxy('__iter__')
     __call__        = _make_func_proxy('__call__')
@@ -156,7 +165,7 @@ class Lifeline(object):
     __contains__    = _make_func_proxy('__contains__')
     __div__         = _make_func_proxy('__div__')
     __divmod__      = _make_func_proxy('__divmod__')
-    __len__         = _make_func_proxy('__len__')
+    
 
     
     __getitem__     = _make_func_proxy('__getitem__')
