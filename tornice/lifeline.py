@@ -93,7 +93,12 @@ def _make_func_proxy(name):
         return getattr(obj, name)(*args, **kw)
     return invoke
 
-
+def _make_ioptr_proxy(name):
+    def optr(self, *args, **kw):
+        obj = _get_this_object(self, sys._getframe(1))
+        getattr(obj, name)(*args, **kw)
+        return self
+    return optr
 
 def _get_this_object(lifeline, frame):
     hist  = object.__getattribute__(lifeline, "_lifeline_history")
@@ -149,55 +154,56 @@ class Lifeline(object):
     __cmp__         = _make_func_proxy('__cmp__')
     __coerce__      = _make_func_proxy('__coerce__')
     __contains__    = _make_func_proxy('__contains__')
-    __delitem__     = _make_func_proxy('__delitem__')
-    __delslice__    = _make_func_proxy('__delslice__')
     __div__         = _make_func_proxy('__div__')
     __divmod__      = _make_func_proxy('__divmod__')
     __len__         = _make_func_proxy('__len__')
 
-    __eq__          = _make_func_proxy('__eq__')
-    __float__       = _make_func_proxy('__float__')
     
     __getitem__     = _make_func_proxy('__getitem__')
     __getslice__    = _make_func_proxy('__getslice__')
     __setitem__     = _make_func_proxy('__setitem__')
     __setslice__    = _make_func_proxy('__setslice__')
+    __delitem__     = _make_func_proxy('__delitem__')
+    __delslice__    = _make_func_proxy('__delslice__')
 
     __floordiv__    = _make_func_proxy('__floordiv__')
     __ge__          = _make_func_proxy('__ge__')
-
+    __eq__          = _make_func_proxy('__eq__')
     __gt__          = _make_func_proxy('__gt__')
      
     __hex__         = _make_func_proxy('__hex__')
-    __iadd__        = _make_func_proxy('__iadd__')
-    __iand__        = _make_func_proxy('__iand__')
-    __idiv__        = _make_func_proxy('__idiv__')
-    __idivmod__     = _make_func_proxy('__idivmod__')
-    __ifloordiv__   = _make_func_proxy('__ifloordiv__')
-    __ilshift__     = _make_func_proxy('__ilshift__')
-    __imod__        = _make_func_proxy('__imod__')
-    __imul__        = _make_func_proxy('__imul__')
-    __int__         = _make_func_proxy('__int__')
-    __invert__      = _make_func_proxy('__invert__')
-    __ior__         = _make_func_proxy('__ior__')
-    __ipow__        = _make_func_proxy('__ipow__')
-    __irshift__     = _make_func_proxy('__irshift__')
-    __isub__        = _make_func_proxy('__isub__')
+    __oct__         = _make_func_proxy('__oct__')
+    __long__        = _make_func_proxy('__long__')
+    __float__       = _make_func_proxy('__float__')
+    
+    __iadd__        = _make_ioptr_proxy('__iadd__')
+    __iand__        = _make_ioptr_proxy('__iand__')
+    __idiv__        = _make_ioptr_proxy('__idiv__')
+    __idivmod__     = _make_ioptr_proxy('__idivmod__')
+    __ifloordiv__   = _make_ioptr_proxy('__ifloordiv__')
+    __ilshift__     = _make_ioptr_proxy('__ilshift__')
+    __imod__        = _make_ioptr_proxy('__imod__')
+    __imul__        = _make_ioptr_proxy('__imul__')
+    __int__         = _make_ioptr_proxy('__int__')
+    __invert__      = _make_ioptr_proxy('__invert__')
+    __ior__         = _make_ioptr_proxy('__ior__')
+    __ipow__        = _make_ioptr_proxy('__ipow__')
+    __irshift__     = _make_ioptr_proxy('__irshift__')
+    __isub__        = _make_ioptr_proxy('__isub__')
+    __itruediv__    = _make_ioptr_proxy('__itruediv__')
+    __ixor__        = _make_ioptr_proxy('__ixor__')
 
-    __itruediv__    = _make_func_proxy('__itruediv__')
-    __ixor__        = _make_func_proxy('__ixor__')
+
 
 
 
     __le__          = _make_func_proxy('__le__')
-    __long__        = _make_func_proxy('__long__')
     __lshift__      = _make_func_proxy('__lshift__')
     __lt__          = _make_func_proxy('__lt__')
     __mod__         = _make_func_proxy('__mod__')
     __mul__         = _make_func_proxy('__mul__')
     __ne__          = _make_func_proxy('__ne__')
     __neg__         = _make_func_proxy('__neg__')
-    __oct__         = _make_func_proxy('__oct__')
     __or__          = _make_func_proxy('__or__')
 
     __pos__         = _make_func_proxy('__pos__')

@@ -21,9 +21,12 @@ class TestLifeline(unittest.TestCase):
                     self.assertEqual(a._this_object, [1,2,3,4])
                     self.assertTrue(bool(a))
                     self.assertEqual(len(a), 4)
-                    # nonlocal a
-                    # a += ['a']
-                    # self.assertEqual(a[1:], [2,3,4, 'a'])
+                    nonlocal a
+                    print(a)
+                    a += ['a']
+                    print(a)
+                    self.assertIsInstance(a, Lifeline)
+                    self.assertEqual(a[1:], [2,3,4, 'a'])
                     print(303, a)
 
             hist = History()
@@ -50,6 +53,9 @@ class TestLifeline(unittest.TestCase):
             with self.assertRaises(LifelineError):
                 with hist.confine((a, 'A1')):
                     pass
+            with self.assertRaises(TypeError):
+                hash(a) # unhashable
+
 
 if __name__ == '__main__':
     unittest.main()
