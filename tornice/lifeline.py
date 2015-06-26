@@ -2,6 +2,8 @@
 
 import sys
 
+import inspect
+
 class History:
     '''object timeline history'''
     
@@ -42,22 +44,77 @@ class History:
             del self._frames[frame]
 
     def top(self, frame, name) :
+        """find the top object at frame stack"""
         assert name is not None
 
         while frame:
-            env = self._frames.get(frame)
-            if env is not None:
-                if name in env:
-                    return env[name]
+            objs = self._frames.get(frame)
+            if objs is not None and name in objs:
+                return objs[name]
+
             if frame == self._start_frame:
                 break
 
             frame = frame.f_back
+        
         return None
 
-    def confine(self, *bindings):
+    def confine(self, bindings, closed_callback=None):
         """ (lifeline, obj), (lifeline, obj) ]"""
-        return _Confine(self, *bindings)
+
+        def decorator(func):
+
+            def wrapper(*args, **kwargs):
+                frame = sys._getframe(1)
+
+                if self.has_frame(frame):
+                    errmsg = 'cannot reenter the same frame(%s)' % frame
+                    raise LifelineError(errmsg)
+
+                for lifeline, obj in bindings:
+                    self.push(frame, id(lifeline), obj)
+
+                ret = None
+                try:
+                    ret = func(*args, **kwargs)
+                finally:
+                    for lifeline, _ in bindings:
+                        self.pop(frame, id(lifeline))
+                    if inspect.isgenerator(ret): 
+                        ret = self._confine_gen(bindings, ret, closed_callback)
+                    else:
+                        if closed_callback:
+                            closed_callback(None, None, None)
+
+                return ret
+
+            return wrapper
+
+        return decorator
+
+    def _confine_gen(self, bindings, generator, closed_callback=None):
+        # generator = genfunc()
+        frame = generator.gi_frame
+        for lifeline, obj in bindings:
+            self.push(frame, id(lifeline), obj)
+
+        def _closed_handler(etype, eval, tb):
+            if closed_callback:
+                if etype == StopIteration: 
+                    return
+
+                closed_callback(etype, eval, tb)
+
+            nonlocal frame
+            for lifeline, _ in bindings:
+                self.pop(frame, id(lifeline))
+
+        proxied = GeneratorClosedProxy(generator, _closed_handler)
+        def wrapped_genfunc():
+            nonlocal proxied
+            yield from proxied
+
+        return proxied
 
 class LifelineError(Exception):
     pass
@@ -65,59 +122,90 @@ class LifelineError(Exception):
 class NoBoundObjectError(LifelineError):
     pass
 
-class _Confine:
 
-    def __init__(self, stack, *bindings):
-        self._stack = stack
-        self._bindings = bindings
+# def confined_func(func,):
 
-    def __enter__(self):
-        frame = sys._getframe(1)
-        if self._stack.has_frame(frame):
-            errmsg = 'cannot reenter the same frame(%s)' % frame
-            raise LifelineError(errmsg)
 
-        print(4444, self._bindings)
-        for lifeline, obj in self._bindings:
-            self._stack.push(frame, id(lifeline), obj)
+# class _Confine:
 
-        return None 
+#     def __init__(self, stack, *bindings):
+#         self._stack = stack
+#         self._bindings = bindings
 
-    def __exit__ (self, etyp, ev, tb):
-        frame = sys._getframe(1)
-        for lifeline, _ in self._bindings:
-            self._stack.pop(frame, id(lifeline))
+#     def __enter__(self):
+#         frame = sys._getframe(1)
+#         if self._stack.has_frame(frame):
+#             errmsg = 'cannot reenter the same frame(%s)' % frame
+#             raise LifelineError(errmsg)
+
+#         for lifeline, obj in self._bindings:
+#             self._stack.push(frame, id(lifeline), obj)
+
+#         return None 
+
+#     def __exit__ (self, etyp, ev, tb):
+#         frame = sys._getframe(1)
+#         for lifeline, _ in self._bindings:
+#             self._stack.pop(frame, id(lifeline))
         
-        return False
+#         return False
 
-def _make_func_proxy(name):
-    def invoke(self, *args, **kw):
-        obj = _get_this_object(self, sys._getframe(1))
-        if obj is None:
-            raise NoBoundObjectError('id=' + str(id(self)))
-        return getattr(obj, name)(*args, **kw)
-    return invoke
 
-def _make_ioptr_proxy(name):
-    def optr(self, *args, **kw):
-        obj = _get_this_object(self, sys._getframe(1))
-        if obj is None:
-            raise NoBoundObjectError('id=' + str(id(self)))
-        getattr(obj, name)(*args, **kw)
-        return self
-    return optr
 
-def _get_this_object(lifeline, frame):
-    hist  = object.__getattribute__(lifeline, "_lifeline_history")
-    return hist.top(frame, id(lifeline))
 
-class Lifeline(object):
-    __slots__ = ("_lifeline_history")
+
+def _make_lifeline_class(theclass, excludes=None):
+
+    if excludes is None:
+        excludes = []
+
+
+    _special_func_names = [
+        '__abs__', '__add__', '__and__', '__call__', '__cmp__', '__coerce__', 
+        '__contains__', '__delitem__', '__delslice__', '__div__', '__divmod__', 
+        '__eq__', '__float__', '__floordiv__', '__ge__', '__getitem__', 
+        '__getslice__', '__gt__', '__hash__', '__hex__', 
+        '__int__', '__invert__',  '__iter__', '__le__', '__len__', 
+        '__long__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__', 
+        '__neg__', '__oct__', '__or__', '__pos__', '__pow__', '__radd__', 
+        '__rand__', '__rdiv__', '__rdivmod__', '__reduce__', '__reduce_ex__', 
+        '__repr__', '__reversed__', '__rfloorfiv__', '__rlshift__', '__rmod__', 
+        '__rmul__', '__ror__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__', 
+        '__rtruediv__', '__rxor__', '__setitem__', '__setslice__', '__sub__', 
+        '__truediv__', '__xor__', '__next__',]
+
+    _special_ioptr_names = [
+        '__iadd__', '__iand__', '__idiv__', '__idivmod__', '__ifloordiv__', 
+        '__ilshift__', '__imod__', '__imul__', '__ior__', '__ipow__', '__irshift__', 
+        '__isub__', '__itruediv__', '__ixor__', 
+    ]
+
+    def _get_this_object(lifeline, frame):
+        hist  = object.__getattribute__(lifeline, "_lifeline_history")
+        return hist.top(frame, id(lifeline))
+
+
+    def _make_func_proxy(name):
+        def invoke(self, *args, **kw):
+            obj = _get_this_object(self, sys._getframe(1))
+            if obj is None:
+                raise NoBoundObjectError('id=' + str(id(self)))
+            return getattr(obj, name)(*args, **kw)
+        return invoke
+
+    def _make_ioptr_proxy(name):
+        def optr(self, *args, **kw):
+            obj = _get_this_object(self, sys._getframe(1))
+            if obj is None:
+                raise NoBoundObjectError('id=' + str(id(self)))
+            getattr(obj, name)(*args, **kw)
+            
+            return self
+        return optr    
 
     def __init__(self, _history):
         object.__setattr__(self, "_lifeline_history", _history)
 
-    @property
     def _this_object(self):
         return _get_this_object(self, sys._getframe(1))
 
@@ -133,113 +221,132 @@ class Lifeline(object):
             raise Lifeline('Attribute ' + name + ' read-only')
 
         setattr(_get_this_object(self, sys._getframe(1)), name, value)
-    
-    # def __hash__(self):
-    #     object.__hash__(self)
 
-    # def __str__(self):
-    #     return object.__getattribute__(self, "__repr__")()
-    
     def __repr__(self):
         cls   = object.__getattribute__(self, "__class__")
         obj   = _get_this_object(self, sys._getframe(1))
         return '%s(id=%r, this_object=%r)' % (cls.__name__, id(self), obj)
 
-    # def __nonzero__(self):
-    #     return bool(_get_this_object(self, sys._getframe(1)))
+    attrs = dict(
+        __slots__       = ('_lifeline_history',),
+        __init__        = __init__,
+        _this_object    = property(_this_object),
+        __getattribute__= __getattribute__, 
+        __setattr__     = __setattr__,
+        __repr__        = __repr__
+        )
 
+    needed = []
+    for name in _special_func_names:
+        if name not in excludes and hasattr(theclass, name) and name not in attrs:
+            needed.append((name, _make_func_proxy(name)))
+
+    for name in _special_ioptr_names:
+        if name not in excludes and hasattr(theclass, name) and name not in attrs:
+            needed.append((name, _make_ioptr_proxy(name)))
+
+    attrs.update(needed)
+
+    return type('Lifeline', (object,), attrs)
+
+class GeneratorClosedProxy:
+    __slots__ = ('_gen_obj', '_closed_callback')
+
+    def __init__(self, genobj, closed_callback):
+        """ """
+        object.__setattr__(self, "_gen_obj", genobj)
+        object.__setattr__(self, "_closed_callback", closed_callback)
+
+        print(self, genobj)
+
+    def __getattribute__(self, name):
+        print(name)
+        return getattr(object.__getattribute__(self, "_gen_obj"), name)
+
+    def __next__(self):
+        """ """
+        genobj = object.__getattribute__(self, "_gen_obj")
+        try:
+            return genobj.__getattribute__('__next__')()
+        except :
+            
+            if inspect.getgeneratorstate(genobj) == 'GEN_CLOSED':
+                etype, eval, tb = sys.exc_info()
+                object.__getattribute__(self, "_closed_callback")(etype, eval, tb)
+
+            raise
+
+    def __del__(self):
+        obj = object.__getattribute__(self, "_gen_obj")
+        if hasattr(obj, '__del__'):
+            getattr(obj, '__del__')()    
+        
+        etype, eval, tb = sys.exc_info()
+        object.__getattribute__(self, "_closed_callback")(etype, eval, tb)        
+
+    
     def __delattr__(self, name):
-        delattr(_get_this_object(self, sys._getframe(1)), name)
+        delattr(object.__getattribute__(self, "_gen_obj"), name)
 
-    __len__         = _make_func_proxy('__len__')
+    def __setattr__(self, name, value):
+        setattr(object.__getattribute__(self, "_gen_obj"), name, value)
 
-    __iter__        = _make_func_proxy('__iter__')
-    __call__        = _make_func_proxy('__call__')
+    def __iter__(self) :
+        obj = object.__getattribute__(self, "_gen_obj")
+        val = obj.__getattribute__('__iter__')()
+        assert obj == val
+        return self
+  
+    def __doc__(self) :
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__doc__')
 
-    __abs__         = _make_func_proxy('__abs__')
-    __add__         = _make_func_proxy('__add__')
-    __and__         = _make_func_proxy('__and__')
-    
-    __cmp__         = _make_func_proxy('__cmp__')
-    __coerce__      = _make_func_proxy('__coerce__')
-    __contains__    = _make_func_proxy('__contains__')
-    __div__         = _make_func_proxy('__div__')
-    __divmod__      = _make_func_proxy('__divmod__')
-    
+    def __repr__(self):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return '<proxy %r at 0x%x>' % (obj, id(self)) 
 
-    
-    __getitem__     = _make_func_proxy('__getitem__')
-    __getslice__    = _make_func_proxy('__getslice__')
-    __setitem__     = _make_func_proxy('__setitem__')
-    __setslice__    = _make_func_proxy('__setslice__')
-    __delitem__     = _make_func_proxy('__delitem__')
-    __delslice__    = _make_func_proxy('__delslice__')
+    def __hash__(self):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__hash__')()       
 
-    __floordiv__    = _make_func_proxy('__floordiv__')
-    __ge__          = _make_func_proxy('__ge__')
-    __eq__          = _make_func_proxy('__eq__')
-    __gt__          = _make_func_proxy('__gt__')
-     
-    __hex__         = _make_func_proxy('__hex__')
-    __oct__         = _make_func_proxy('__oct__')
-    __long__        = _make_func_proxy('__long__')
-    __float__       = _make_func_proxy('__float__')
-    
-    __iadd__        = _make_ioptr_proxy('__iadd__')
-    __iand__        = _make_ioptr_proxy('__iand__')
-    __idiv__        = _make_ioptr_proxy('__idiv__')
-    __idivmod__     = _make_ioptr_proxy('__idivmod__')
-    __ifloordiv__   = _make_ioptr_proxy('__ifloordiv__')
-    __ilshift__     = _make_ioptr_proxy('__ilshift__')
-    __imod__        = _make_ioptr_proxy('__imod__')
-    __imul__        = _make_ioptr_proxy('__imul__')
-    __int__         = _make_ioptr_proxy('__int__')
-    __invert__      = _make_ioptr_proxy('__invert__')
-    __ior__         = _make_ioptr_proxy('__ior__')
-    __ipow__        = _make_ioptr_proxy('__ipow__')
-    __irshift__     = _make_ioptr_proxy('__irshift__')
-    __isub__        = _make_ioptr_proxy('__isub__')
-    __itruediv__    = _make_ioptr_proxy('__itruediv__')
-    __ixor__        = _make_ioptr_proxy('__ixor__')
+    def __format__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__format__')(*args, **kwargs)       
+
+    def __reduce__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__reduce__')(*args, **kwargs)   
+
+    def __reduce_ex__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__reduce_ex__')(*args, **kwargs)           
+
+    def __eq__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__eq__')(*args, **kwargs)           
+
+    def __ne__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__ne__')(*args, **kwargs)           
+
+    def __gt__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__gt__')(*args, **kwargs)           
+
+    def __ge__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__ge__')(*args, **kwargs)           
+
+    def __le__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__le__')(*args, **kwargs)           
+
+    def __lt__(self, *args, **kwargs):
+        obj = object.__getattribute__(self, "_gen_obj")
+        return obj.__getattribute__('__lt__')(*args, **kwargs)           
 
 
 
 
-
-    __le__          = _make_func_proxy('__le__')
-    __lshift__      = _make_func_proxy('__lshift__')
-    __lt__          = _make_func_proxy('__lt__')
-    __mod__         = _make_func_proxy('__mod__')
-    __mul__         = _make_func_proxy('__mul__')
-    __ne__          = _make_func_proxy('__ne__')
-    __neg__         = _make_func_proxy('__neg__')
-    __or__          = _make_func_proxy('__or__')
-
-    __pos__         = _make_func_proxy('__pos__')
-    __pow__         = _make_func_proxy('__pow__')
-    __radd__        = _make_func_proxy('__radd__')
-    __rand__        = _make_func_proxy('__rand__')
-    __rdiv__        = _make_func_proxy('__rdiv__')
-    __rdivmod__     = _make_func_proxy('__rdivmod__')
-    __reduce__      = _make_func_proxy('__reduce__')
-    __reduce_ex__   = _make_func_proxy('__reduce_ex__')
-
-    __reversed__    = _make_func_proxy('__reversed__')
-    __rfloorfiv__   = _make_func_proxy('__rfloorfiv__')
-    __rlshift__     = _make_func_proxy('__rlshift__')
-    
-
-    __rmod__        = _make_func_proxy('__rmod__')
-    __rmul__        = _make_func_proxy('__rmul__')
-    __ror__         = _make_func_proxy('__ror__')
-    __rpow__        = _make_func_proxy('__rpow__')
-    __rrshift__     = _make_func_proxy('__rrshift__')
-    __rshift__      = _make_func_proxy('__rshift__')
-    __rsub__        = _make_func_proxy('__rsub__')
-    __rtruediv__    = _make_func_proxy('__rtruediv__')
-    __rxor__        = _make_func_proxy('__rxor__')
-    __sub__         = _make_func_proxy('__sub__')
-    __truediv__     = _make_func_proxy('__truediv__')
-    __xor__         = _make_func_proxy('__xor__')
-
+_lifeline_history = History()
 
