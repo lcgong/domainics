@@ -71,3 +71,71 @@ def nameddict(typename, field_names):
 
     return result
 
+from bisect import insort_left
+from bisect import bisect_left
+
+class ContentTree:
+    """A tree where the content are stored."""
+
+    def __init__(self):
+        self._points   = {} # point -> content
+        self._children = {} # parent_point -> [ordered_child_points]
+        self._parent   = {} #  child_point -> parent_point
+
+    def __getitem__(self, point):
+        """Get the content that the given point refered to."""
+        return self._points.get(point)
+
+    def set(self, point, content=None, parent=None):
+        self._points[point] = content
+
+        if parent is None:
+            return
+
+        self._parent[point] = parent
+        try:
+            children = self._children[parent]
+        except KeyError:
+            self._children[parent] = children = []
+        
+        insort_left(children, point)   
+
+    def unset(self, point):
+        """unset the point from tree, remove content and its parent's edge. 
+        The point can not be unseted if its' child points exits. 
+        """
+
+        if self._children.get(point):
+            errmsg = 'point %r has %d children, cannot unset it' 
+            errmsg %= (point, len(self._children.get(point)))
+            raise ValueError(errmsg)
+
+        del self._points[point]
+        parent = self._parent.get(point)
+        if parent is not None:
+            del self._parent[point]
+
+            # find the point in parent's children and remove it
+            children = self._children[parent]
+            idx = bisect_left(children, point)
+            assert children[idx] == point # should find it
+            del children[idx]
+
+    def parent(self, point):
+        """The parent point of the given point"""
+        return self._parent.get(point)
+
+    def children(self, point):
+        """A children point list of the given point"""
+        return self._children.get(point)
+
+    def upwards(self, point):
+        """Enumerate the points upwards."""
+
+        while True:
+            parent = self._parent.get(point)
+            if parent is None:
+                break
+            yield parent
+            point = parent
+

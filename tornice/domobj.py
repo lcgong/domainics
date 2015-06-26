@@ -1,11 +1,12 @@
+# -*- coding: utf-8 -*-
+
 
 import logging
 
 _logger = logging.getLogger(__name__)
 
 
-# -*- coding: utf-8 -*-
-
+from abc import abstractmethod
 from collections import OrderedDict as _Dict
 
 class DObjectMetaClass(type):
@@ -70,71 +71,49 @@ class dlist(dfield):
         self.default_expr = None
         self.__doc__      = doc
 
-class DobjectList(list):
+class DomainObject(metaclass=DObjectMetaClass):
+    
+    @property
+    def _pristine(self):
+        raise NotImplementedError()
 
-    # def __delitem__(self, index):
-    #     raise IndexError
+    def _set_pristine(self):
+        raise NotImplementedError()
+    
 
-    # @abstractmethod
-    # def insert(self, index, value):
-    #     'S.insert(index, value) -- insert value before index'
-    #     raise IndexError
+class DObjectList(DomainObject, list):
+    __orig_list__ = []
 
-    # def append(self, value):
-    #     'S.append(value) -- append value to the end of the sequence'
-    #     self.insert(len(self), value)
+    def __init__(self, iterable=None):
 
-    # def clear(self):
-    #     'S.clear() -> None -- remove all items from S'
-    #     try:
-    #         while True:
-    #             self.pop()
-    #     except IndexError:
-    #         pass
+        self.__orig_list__ = list(iterable)
 
-    # def reverse(self):
-    #     'S.reverse() -- reverse *IN PLACE*'
-    #     n = len(self)
-    #     for i in range(n//2):
-    #         self[i], self[n-i-1] = self[n-i-1], self[i]
+        super(DObjectList, self).__init__(iterable)
 
-    def extend(self, values):
-        'S.extend(iterable) -- extend sequence by appending elements from the iterable'
-        for v in values:
-            self.append(v)
+    @property
+    def _pristine(self):
+        "True if this object are not changed"
 
-    def pop(self, index=-1):
-        '''S.pop([index]) -> item -- remove and return item at index (default last).
-           Raise IndexError if list is empty or index is out of range.
-        '''
-        v = self[index]
-        del self[index]
-        return v
+        if self != self.__orig_list__:
+            return False
 
-    def remove(self, value):
-        '''S.remove(value) -- remove first occurrence of value.
-           Raise ValueError if the value is not present.
-        '''
-        del self[self.index(value)]
+        for value in self:
+            if isinstance(value, DomainObject):
+                if not value._pristine:
+                    return False
 
-    def __iadd__(self, values):
-        self.extend(values)
-        return self
+        return True
+
+    def _set_pristine(self):
+        self.__orig_list__.clear()
+        self.__orig_list__.extend(self)
+
+        for value in self:
+            if isinstance(value, DomainObject):
+                value._set_pristine()
 
 
-# 'append',
-#  'clear',
-#  'copy',
-#  'count',
-#  'extend',
-#  'index',
-#  'insert',
-#  'pop',
-#  'remove',
-#  'reverse',
-#  'sort']  
-
-class dobject(metaclass=DObjectMetaClass):
+class dobject(DomainObject):
 
     def __new__(cls, **kwargs):
         """ """

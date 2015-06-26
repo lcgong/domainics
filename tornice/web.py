@@ -71,6 +71,12 @@ def request_handler_def(path, handler_func, methods=None, fields=None, proto=Non
 from tornado.log import access_log
 import mimetypes
 
+from tornice.lifeline import _lifeline_history, _make_lifeline_class
+
+
+
+handler = _make_lifeline_class(tornado.web.RequestHandler)(_lifeline_history)
+
 
 def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
 
@@ -78,18 +84,21 @@ def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
     path_fields    = [f for f in func_signature if f in set(path_fields)]
     qry_fields     = [f for f in func_signature if f in set(qry_fields)]
 
-    def handler_wrapper(serv_func, qry_fields):
-        def handler(self, **kwargs):
-            kwargs.update([('handler', self)])
+    def handler_wrapper(func, qry_fields):
+        def handler_func(self, **kwargs):
+            print(678)
+            nonlocal func
             kwargs.update([(n, self.get_argument(n, None)) for n in qry_fields])
 
             try:
                 self._handler_args = kwargs
-                return serv_func(**kwargs)
+                confine = _lifeline_history.confine([(handler, self)])
+                wrapped_func = confine(func)
+                return wrapped_func(**kwargs)
             finally:
                 self._handler_args = None
 
-        return handler
+        return handler_func
 
     typename      = serv_func.__name__ + '_handler'
     handler_name  = serv_func.__module__ + '.' + serv_func.__name__
@@ -152,10 +161,8 @@ class WebApp:
         self._request_handlers = []
         self.settings = settings
 
-        # add handlers defined in the module where the WebApp object are created
-        routes = _get_module_routes(inspect.currentframe().f_back)
-        for path, handler, settings in routes.handlers:
-            self._request_handlers.append((path, handler, settings))  
+        main_module = inspect.getmodule(inspect.currentframe().f_back.f_code)
+        self.add_handler_module(main_module)
     
     
     def add_static_handler(self, url_path, folder=None, index='index.html', default=None):

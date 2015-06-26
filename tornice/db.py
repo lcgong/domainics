@@ -17,26 +17,26 @@ def set_dsn(**kwargs):
     dbsys = kwargs.pop('sys', 'postgres')
     dsn   = kwargs.get('dsn', 'DEFAULT')
     if dbsys in ('postgres', 'pgsql', 'pg') :
-    	import tornice.db_postgres as _pg
+        import tornice.db_postgres as _pg
 
-    	_dsn_class[dsn] = _pg.PostgreSQLBlock
-    	_pg.PostgreSQLBlock.set_dsn(**kwargs)
+        _dsn_class[dsn] = _pg.PostgreSQLBlock
+        _pg.PostgreSQLBlock.set_dsn(**kwargs)
     elif dbsys in ('sqlite'):
-    	raise NotImplemented('sqlite')
+        raise NotImplemented('sqlite')
 
     elif dbsys in ('mysql'):
-    	raise NotImplemented('mysql')
+        raise NotImplemented('mysql')
 
 def sqlblock(dsn='DEFAULT', autocommit=False, record_type=None):
-	
-	sqlblock_class = _dsn_class[dsn]
+    
+    sqlblock_class = _dsn_class[dsn]
 
-	blkobj = sqlblock_class(
-		dsn=dsn, 
-		autocommit=autocommit, 
-		record_type=record_type)
+    blkobj = sqlblock_class(
+        dsn=dsn, 
+        autocommit=autocommit, 
+        record_type=record_type)
 
-	return blkobj
+    return blkobj
 
 def record_dict(cursor):
     fields = (d[0] for d in cursor.description)
@@ -111,6 +111,15 @@ class BaseSQLBlock:
 _default_record_type = record_plainobj
 
 
+import functools
+from .lifeline import _lifeline_history, _make_lifeline_class, LifelineError
+# from .lifeline import History, _make_lifeline_class
+
+
+sql = _make_lifeline_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_lifeline_history)
+psql = sqlite = mysql = sql
+
+
 def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
     """ 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
     
@@ -129,24 +138,31 @@ def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
     
     def _decorator(func):
         def sqlblock_wrapper(*args, **kwargs):
-            obj = args[0]
-            if hasattr(obj, 'sql') and obj.sql is not None:
-                # sqlblock嵌套重入，如果当前线程已经建立了一个连接，
-                # 则继续使用这一个连接
-                return func(*args, **kwargs)
-            else :
-                # 新建sqlblock环境
-                with SimpleSqlBlock(dsn, autocommit) as sqlblk:
-                    try :
-                        setattr(obj, 'sql', sqlblk)
-                        return func(*args, **kwargs)
-                    finally:
-                        setattr(obj, 'sql', None)
+
+            if sql._this_object is not None: 
+                # no allow to reenter a new transaction
+                func(*args, **kwargs)
+            else:
+                sqlblk = sqlblock(dsn=dsn, autocommit=autocommit)
+
+                def closed_handler(etyp, eval, tb):
+                    sqlblk.__exit__(etyp, eval, tb)
+
+                confine = _lifeline_history.confine([(sql, sqlblk)], closed_handler)
+                wrapped_func = confine(func)
+                sqlblk.__enter__()
+                ret = wrapped_func(**kwargs)
+
+
+                if hasattr(ret, '_lifeline_history'):
+                    raise LifelineError('cannot return a lifeline object')
+                return ret
                 
         functools.update_wrapper(sqlblock_wrapper, func)
         return sqlblock_wrapper
     
-    if len(d_args) == 1 and callable(d_args[0]): # 没有参数的decorator
+    if len(d_args) == 1 and callable(d_args[0]): 
+        # no argument decorator
         return _decorator(d_args[0])
     else:
         return _decorator
