@@ -71,11 +71,11 @@ def request_handler_def(path, handler_func, methods=None, fields=None, proto=Non
 from tornado.log import access_log
 import mimetypes
 
-from tornice.lifeline import _lifeline_history, _make_lifeline_class
+from tornice.pillar import _pillar_history, pillar_class
 
 
 
-handler = _make_lifeline_class(tornado.web.RequestHandler)(_lifeline_history)
+handler = pillar_class(tornado.web.RequestHandler)(_pillar_history)
 
 
 def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
@@ -86,17 +86,16 @@ def _make_handler_class(serv_func, proto, methods, path_fields, qry_fields):
 
     def handler_wrapper(func, qry_fields):
         def handler_func(self, **kwargs):
-            print(678)
             nonlocal func
             kwargs.update([(n, self.get_argument(n, None)) for n in qry_fields])
 
-            try:
-                self._handler_args = kwargs
-                confine = _lifeline_history.confine([(handler, self)])
-                wrapped_func = confine(func)
-                return wrapped_func(**kwargs)
-            finally:
+            self._handler_args = kwargs
+            
+            def exit_callback(exc_type, exc_val, tb):
                 self._handler_args = None
+
+            func = _pillar_history.bound(func, [(handler, self)], exit_callback)
+            ret = func(**kwargs)
 
         return handler_func
 

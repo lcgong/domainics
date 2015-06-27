@@ -112,11 +112,10 @@ _default_record_type = record_plainobj
 
 
 import functools
-from .lifeline import _lifeline_history, _make_lifeline_class, LifelineError
-# from .lifeline import History, _make_lifeline_class
+from .pillar import _pillar_history, pillar_class, PillarError
 
 
-sql = _make_lifeline_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_lifeline_history)
+sql = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_pillar_history)
 psql = sqlite = mysql = sql
 
 
@@ -145,17 +144,18 @@ def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
             else:
                 sqlblk = sqlblock(dsn=dsn, autocommit=autocommit)
 
-                def closed_handler(etyp, eval, tb):
+                def exit_callback(etyp, eval, tb):
                     sqlblk.__exit__(etyp, eval, tb)
 
-                confine = _lifeline_history.confine([(sql, sqlblk)], closed_handler)
-                wrapped_func = confine(func)
+                func = _pillar_history.bound(func, [(sql, sqlblk)], exit_callback)
+
                 sqlblk.__enter__()
-                ret = wrapped_func(**kwargs)
+                ret = func(**kwargs)
 
 
-                if hasattr(ret, '_lifeline_history'):
-                    raise LifelineError('cannot return a lifeline object')
+                if hasattr(ret, '_pillar_history'):
+                    raise PillarError('sql block cannot return a pillar object')
+
                 return ret
                 
         functools.update_wrapper(sqlblock_wrapper, func)

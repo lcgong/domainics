@@ -59,55 +59,59 @@ class History:
         
         return None
 
-    def confine(self, bindings, closed_callback=None):
-        """ (lifeline, obj), (lifeline, obj) ]"""
+    def bound(self, func, bindings, exit_callback=None):
+        """ bound func with binding pillars. 
+        When the bounded has returned, the exit_callback will be called.
+        
+        :param func: the bouding function
+        :param bindings: a list binding variables [(pillar, value)]
+        :param exit_callback: a callback function with three arguments. exit_callback(exc_type, exc_val, tb)
+        """
 
-        def decorator(func):
+        def bound_func(*args, **kwargs):
+            frame = sys._getframe(1)
 
-            def wrapper(*args, **kwargs):
-                frame = sys._getframe(1)
+            if self.has_frame(frame):
+                errmsg = 'cannot reenter the same frame(%s)' % frame
+                raise PillarError(errmsg)
 
-                if self.has_frame(frame):
-                    errmsg = 'cannot reenter the same frame(%s)' % frame
-                    raise LifelineError(errmsg)
+            for pillar, obj in bindings:
+                self.push(frame, id(pillar), obj)
 
-                for lifeline, obj in bindings:
-                    self.push(frame, id(lifeline), obj)
+            ret = None
+            try:
+                ret = func(*args, **kwargs)
+            finally:
+                for pillar, _ in bindings:
+                    self.pop(frame, id(pillar))
+                if inspect.isgenerator(ret): 
+                    ret = self._confine_gen(bindings, ret, exit_callback)
+                else:
+                    if exit_callback:
+                        exc_type, exc_val, tb = sys.exc_info()
+                        exit_callback(exc_type, exc_val, tb)
 
-                ret = None
-                try:
-                    ret = func(*args, **kwargs)
-                finally:
-                    for lifeline, _ in bindings:
-                        self.pop(frame, id(lifeline))
-                    if inspect.isgenerator(ret): 
-                        ret = self._confine_gen(bindings, ret, closed_callback)
-                    else:
-                        if closed_callback:
-                            closed_callback(None, None, None)
+            return ret
 
-                return ret
+        return bound_func
 
-            return wrapper
-
-        return decorator
 
     def _confine_gen(self, bindings, generator, closed_callback=None):
         # generator = genfunc()
         frame = generator.gi_frame
-        for lifeline, obj in bindings:
-            self.push(frame, id(lifeline), obj)
+        for pillar, obj in bindings:
+            self.push(frame, id(pillar), obj)
 
-        def _closed_handler(etype, eval, tb):
+        def _closed_handler(exc_type, exc_val, tb):
             if closed_callback:
-                if etype == StopIteration: 
+                if exc_type == StopIteration: 
                     return
 
-                closed_callback(etype, eval, tb)
+                closed_callback(exc_type, exc_val, tb)
 
             nonlocal frame
-            for lifeline, _ in bindings:
-                self.pop(frame, id(lifeline))
+            for pillar, _ in bindings:
+                self.pop(frame, id(pillar))
 
         proxied = GeneratorClosedProxy(generator, _closed_handler)
         def wrapped_genfunc():
@@ -116,45 +120,14 @@ class History:
 
         return proxied
 
-class LifelineError(Exception):
+class PillarError(Exception):
     pass
 
-class NoBoundObjectError(LifelineError):
+class NoBoundObjectError(PillarError):
     pass
 
-
-# def confined_func(func,):
-
-
-# class _Confine:
-
-#     def __init__(self, stack, *bindings):
-#         self._stack = stack
-#         self._bindings = bindings
-
-#     def __enter__(self):
-#         frame = sys._getframe(1)
-#         if self._stack.has_frame(frame):
-#             errmsg = 'cannot reenter the same frame(%s)' % frame
-#             raise LifelineError(errmsg)
-
-#         for lifeline, obj in self._bindings:
-#             self._stack.push(frame, id(lifeline), obj)
-
-#         return None 
-
-#     def __exit__ (self, etyp, ev, tb):
-#         frame = sys._getframe(1)
-#         for lifeline, _ in self._bindings:
-#             self._stack.pop(frame, id(lifeline))
-        
-#         return False
-
-
-
-
-
-def _make_lifeline_class(theclass, excludes=None):
+def pillar_class(theclass, excludes=None):
+    """make pillar class like theclass"""
 
     if excludes is None:
         excludes = []
@@ -180,9 +153,9 @@ def _make_lifeline_class(theclass, excludes=None):
         '__isub__', '__itruediv__', '__ixor__', 
     ]
 
-    def _get_this_object(lifeline, frame):
-        hist  = object.__getattribute__(lifeline, "_lifeline_history")
-        return hist.top(frame, id(lifeline))
+    def _get_this_object(pillar, frame):
+        hist  = object.__getattribute__(pillar, "_pillar_history")
+        return hist.top(frame, id(pillar))
 
 
     def _make_func_proxy(name):
@@ -204,21 +177,21 @@ def _make_lifeline_class(theclass, excludes=None):
         return optr    
 
     def __init__(self, _history):
-        object.__setattr__(self, "_lifeline_history", _history)
+        object.__setattr__(self, "_pillar_history", _history)
 
     def _this_object(self):
         return _get_this_object(self, sys._getframe(1))
 
 
     def __getattribute__(self, name):
-        if name == '_this_object' or name.startswith('_lifeline_'):
+        if name == '_this_object' or name.startswith('_pillar_'):
             return object.__getattribute__(self, name)
 
         return getattr(_get_this_object(self, sys._getframe(1)), name)
 
     def __setattr__(self, name, value):
-        if name == '_this_object' or name.startswith('_lifeline_'):
-            raise Lifeline('Attribute ' + name + ' read-only')
+        if name == '_this_object' or name.startswith('_pillar_'):
+            raise Pillar('Attribute ' + name + ' read-only')
 
         setattr(_get_this_object(self, sys._getframe(1)), name, value)
 
@@ -228,7 +201,7 @@ def _make_lifeline_class(theclass, excludes=None):
         return '%s(id=%r, this_object=%r)' % (cls.__name__, id(self), obj)
 
     attrs = dict(
-        __slots__       = ('_lifeline_history',),
+        __slots__       = ('_pillar_history',),
         __init__        = __init__,
         _this_object    = property(_this_object),
         __getattribute__= __getattribute__, 
@@ -247,7 +220,7 @@ def _make_lifeline_class(theclass, excludes=None):
 
     attrs.update(needed)
 
-    return type('Lifeline', (object,), attrs)
+    return type('Pillar', (object,), attrs)
 
 class GeneratorClosedProxy:
     __slots__ = ('_gen_obj', '_closed_callback')
@@ -348,5 +321,5 @@ class GeneratorClosedProxy:
 
 
 
-_lifeline_history = History()
+_pillar_history = History()
 

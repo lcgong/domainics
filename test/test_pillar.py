@@ -4,22 +4,22 @@ import unittest
 
 
 
-from tornice.lifeline import _make_lifeline_class, History, LifelineError, NoBoundObjectError
+from tornice.pillar import pillar_class, History, PillarError, NoBoundObjectError
 
 
 
 
-class TestLifeline(unittest.TestCase):
+class TestPillar(unittest.TestCase):
 
     def test_1(self):
         hist = History()
-        Lifeline = _make_lifeline_class(str)
-        a = Lifeline(hist)
+        Pillar = pillar_class(str)
+        a = Pillar(hist)
 
         def f1():
             nonlocal a
             print(201, a)
-            hist.confine([(a, 'B')])(f2)()
+            hist.bound(f2, [(a, 'B')])()
             print(202, a)
         
         def f2():
@@ -27,19 +27,18 @@ class TestLifeline(unittest.TestCase):
             print(300, a)
 
         print(101, a)
-        hist.confine([(a, 'A')])(f1)()
+        hist.bound(f2, [(a, 'A')])()
         print(102, a)
 
     def test_2(self):
         hist = History()
-        Lifeline = _make_lifeline_class(str)
-        a = Lifeline(hist)
+        Pillar = pillar_class(str)
+        a = Pillar(hist)
 
         def f1():
             nonlocal a
             print(201, a)
-            g = hist.confine([(a, 'B')])(f2)()
-
+            g = hist.bound(f2, [(a, 'B')])()
 
             
             for r0, r1 in g:
@@ -58,17 +57,46 @@ class TestLifeline(unittest.TestCase):
                 # raise ValueError()
 
         print(101, a)
-        hist.confine([(a, 'A')])(f1)()
+        hist.bound(f1, [(a, 'A')])()
         print(102, a)
+
+
+    def test_3(self):
+        hist = History()
+        StrPillar = pillar_class(str)
+        a = StrPillar(hist)
+
+        target_obj = None
+        def f():
+            nonlocal a, target_obj
+            print(201, a)
+            self.assertEqual(a, target_obj)
+
+        f1 = hist.bound(f, [(a, 'A1')])
+        f2 = hist.bound(f, [(a, 'A2')])
+
+        print(101, a)
+        target_obj = 'A1'
+        f1()
+        print(102, a)
+
+    
+        print(101, a)
+        target_obj = 'A2'
+        f2()
+        print(102, a)
+    
+        
+
 
     # def test_a(self):
     #     def f1():
     #         hist = History()
             
-    #         LifelineA = _make_lifeline_class(list)
-    #         LifelineB = _make_lifeline_class(str)
-    #         a = LifelineA(hist)
-    #         b = LifelineB(hist)
+    #         PillarA = pillar_class(list)
+    #         PillarB = pillar_class(str)
+    #         a = PillarA(hist)
+    #         b = PillarB(hist)
 
     #         def f2():
     #             nonlocal a
@@ -83,7 +111,7 @@ class TestLifeline(unittest.TestCase):
     #                 print(type(a))
     #                 a += ['a']
     #                 print(type(a))
-    #                 self.assertIsInstance(a, LifelineA)
+    #                 self.assertIsInstance(a, PillarA)
     #                 self.assertEqual(a[1:], [2,3,4, 'a'])
     #                 print(303, a)
 
@@ -107,9 +135,9 @@ class TestLifeline(unittest.TestCase):
 
     # def test_reenter(self):
     #     hist = History()
-    #     a = Lifeline(hist)
+    #     a = Pillar(hist)
     #     with hist.confine((a, 'A')):
-    #         with self.assertRaises(LifelineError):
+    #         with self.assertRaises(PillarError):
     #             with hist.confine((a, 'A1')):
     #                 pass
     #         with self.assertRaises(TypeError):
