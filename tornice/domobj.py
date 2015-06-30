@@ -82,9 +82,9 @@ class DObjectMetaClass(type):
             if isinstance(attr, dattr):
                 attr.name    = name
                 fields[name] = attr
-            elif isinstance(attr, aggset):
-                # In class-block, aggset is used, replace it with AggregateAttr
-                attr = AggregateAttr(aggset, attr.item_type, attr.__doc__)
+            elif isinstance(attr, doset):
+                # In class-block, doset is used, replace it with AggregateAttr
+                attr = AggregateAttr(doset, attr.item_type, attr.__doc__)
                 attr.name        = name
                 class_dict[name] = attr
                 fields[name]     = attr
@@ -207,7 +207,7 @@ class AggregateAttr:
 class daggregate:
     pass
 
-class aggset(daggregate):
+class doset(daggregate):
     """
     The aggregate object set of domain object.
     """
@@ -221,7 +221,7 @@ class aggset(daggregate):
 
         self.item_type   = item_type
 
-        self.__attr_doc = doc
+        self.__attr_doc  = doc
 
         if iterable is not None:
             for obj in iterable:
@@ -254,20 +254,30 @@ class aggset(daggregate):
     def remove(self, obj):
         index = self.__map.get(obj._dobj_id)
         if index is None:
-            raise ValueError("%r not in aggset" % obj)
+            raise ValueError("%r not in doset" % obj)
 
         del self.__list[index]
 
     def clear(self):
+        """clear all objects in aggregate"""
+
         self.__list.clear()
         self.__map.clear()
 
     def index(self, obj):
+        """The index of the object in this aggregate"""
+
         dobj_id = obj._dobj_id
         index = self.__map.get(dobj_id)
         if index is None:
             raise ValueError ('no value of the identity %r' % dobj_id)
         return index
+
+    def copy(self):
+        """get a copy of the aggregate object and copies of its items"""
+
+        items = (item.copy() for item in self.__list)
+        return doset(self.item_type, items)
 
     def __bool__(self):
         return bool(self.__list)
@@ -280,7 +290,7 @@ class aggset(daggregate):
             yield itemobj
 
     def __repr__(self):
-        s = 'aggset('
+        s = 'doset('
         s += ', '.join([repr(obj) for obj in self.__list])
         s += ')'
         return s
@@ -288,7 +298,7 @@ class aggset(daggregate):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return aggset(self.item_type, self.__list.__getitem__(index))
+            return doset(self.item_type, self.__list.__getitem__(index))
         elif isinstance(index, int):
             return self.__list[index]
         elif isinstance(index, dobject):
@@ -306,7 +316,7 @@ class aggset(daggregate):
 
 
     def __eq__(self, other):
-        if isinstance(other, aggset):
+        if isinstance(other, doset):
             other_iter = other.__list
         elif isinstance(other, list) or isinstance(other, tuple):
             other_iter = other
@@ -379,7 +389,9 @@ class dobject(DomainObject):
 
         for name, attr in fields:
             if isinstance(attr, AggregateAttr):
-                val = attr.agg_type(attr.item_type)
+                val = kwvalues.pop(name, None)
+                if val is None:
+                    val = attr.agg_type(attr.item_type)
             else:
                 val = kwvalues.pop(name, None)
                 val = cast_attr_value(name, val, attr.datatype)
@@ -426,10 +438,14 @@ class dobject(DomainObject):
         1. True if the identity of this object equals that of other;
         2. True if all of fields of this object equal those of other '''
 
+        if other is None :
+            return False
+
         this_id = self._dobj_id
         if this_id is not None and this_id == other._dobj_id:
             return True
 
+        # print(self, other)
 
         if set(self.__attrs.keys()) != set(other.__attrs.keys()):
             return False
@@ -441,6 +457,23 @@ class dobject(DomainObject):
                 return False
         
         return True
+
+    def copy(self):
+        kwargs = OrderedDict()
+        for attr_name in self.__attrs:
+            value = self.__attrs[attr_name]
+
+            if isinstance(value, daggregate) or isinstance(value, dobject) :
+                value = value.copy()
+            else: # some copy
+                pass
+
+            kwargs[attr_name] = value
+
+        return self.__class__(**kwargs)
+
+    def conform(self, target):
+        pass
 
     def _pristine(self):
         "True if this object are not changed"
@@ -455,17 +488,18 @@ class dobject(DomainObject):
 
         return True
 
-    @classmethod
-    def primary_keys(cls, *fields):
-        for field in fields:
-            if not isinstance(field, dattr):
-                errmsg = 'the primary key \'%s\' is not dattr' % field
-                raise TypeError(errmsg)
 
-            cls._primary_keys.add(field)
+    # @classmethod
+    # def primary_keys(cls, *fields):
+    #     for field in fields:
+    #         if not isinstance(field, dattr):
+    #             errmsg = 'the primary key \'%s\' is not dattr' % field
+    #             raise TypeError(errmsg)
 
-    def get_primary_keys(cls):
-        return
+    #         cls._primary_keys.add(field)
+
+    # def get_primary_keys(cls):
+    #     return
 
     @classmethod
     def __get_field__(cls, name):

@@ -1,7 +1,9 @@
 
 import unittest
 
-from tornice.domobj import dobject, dattr, identity, aggset
+import decimal
+import datetime as dt
+from tornice.domobj import dobject, dattr, identity, doset
 
 
 
@@ -131,7 +133,7 @@ class TestDomainObject(unittest.TestCase):
 
 
     @unittest.skip('')
-    def test_aggset(self):
+    def test_doset(self):
         class A(dobject):
             n1 = dattr(int)
             n2 = dattr(int)
@@ -139,7 +141,7 @@ class TestDomainObject(unittest.TestCase):
             
             identity(n1, n2)
 
-        s1 = aggset(A)
+        s1 = doset(A)
         s1.append(A(100, 100, 901))
         s1.append(A(101, 100, 902))
         s1.append(A(102, 100, 903))
@@ -155,11 +157,11 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(s1.index(A(101, 100)), 1)
         
         # slice
-        self.assertEqual(s1[:2], aggset([A(100, 100, 901), A(101, 100, 902)]))
+        self.assertEqual(s1[:2], doset([A(100, 100, 901), A(101, 100, 902)]))
         
 
-    # @unittest.skip('')
-    def test_aggset(self):
+    @unittest.skip('')
+    def test_doset(self):
         class Item(dobject):
             item_no = dattr(str)
             amt     = dattr(float)
@@ -167,20 +169,20 @@ class TestDomainObject(unittest.TestCase):
 
         class Bill(dobject):
             doc_no = dattr(str)
-            items  = aggset(Item)
+            items  = doset(Item)
             identity(doc_no)
 
         bill = Bill(doc_no='123')
         bill.items.append(Item('no001', 100.0))
         bill.items.append(Item('no002', 110.0))
 
-        items = aggset(Item, [Item('no001', 100.0), 
+        items = doset(Item, [Item('no001', 100.0), 
                         Item('no002', 110.0)])
 
         self.assertEqual(bill.items, items)
 
 
-        items = aggset(Item, [
+        items = doset(Item, [
                         Item('no001', 100.0), 
                         Item('no002', 110.0),
                         Item('no003', 111.0)])
@@ -197,7 +199,55 @@ class TestDomainObject(unittest.TestCase):
         bill.items += items
         self.assertTrue(bill.items == items)
 
+    # @unittest.skip('')
+    def test_copy(self):
+        class A(dobject):
+            a1 = dattr(str)
+            a2 = dattr(int)
+            a3 = dattr(decimal.Decimal)
+            a4 = dattr(dt.date)
 
+        a1 = A('abc', 100, '13.4', dt.date(2015,7,1))
+        a2 = a1.copy()
+        self.assertEqual(a1, a2)
+        self.assertIsNot(a1, a2)
+
+        class B(dobject):
+            b0 = dattr(str)
+            b1 = dattr(A)
+
+        b1 = B('xyz01')
+        b1.b1 = A('abc', 100, '13.4', dt.date(2015,7,1))
+        b2 = b1.copy()
+
+        self.assertEqual(b1, b2)
+        self.assertIsNot(b1, b2)
+        self.assertIsNot(b1.b1, b2.b1)
+        self.assertEqual(b1.b1, b2.b1)
+
+        class A(dobject):
+            a1 = dattr(str)
+            a2 = dattr(int)
+
+        class B(dobject):
+            b1 = dattr(dt.date)
+            b2 = dattr(decimal.Decimal)
+
+            identity(b1)
+            
+        class C(dobject):
+            c1    = dattr(int)
+            props = dattr(A)
+            dates = doset(B)
+
+        c1 = C(100)
+        c1.props = A('abc', 2100)
+        c1.dates.append(B(dt.date(2015,7,1), 120.5))
+        c1.dates.append(B(dt.date(2015,7,2), 130.5))    
+
+        c2 = c1.copy()
+        self.assertEqual(c1, c2)
+        print(c1 , '\n', c2, sep='')
 
 
     # def test_dobject_eq(self):
