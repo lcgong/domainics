@@ -192,6 +192,16 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(bill.items, items)
         self.assertIsNot(bill.items, items)
 
+        del bill.items[1]
+        self.assertEqual(bill.items, [items[0], items[2]])
+        bill.items = items
+        del bill.items[Item('no001')]
+        self.assertEqual(bill.items, [items[1], items[2]])
+
+        bill.items = items
+        del bill.items[1:]
+        self.assertEqual(bill.items, [items[0]])
+
         self.assertTrue(bill.items)
         bill.items.clear()
         self.assertFalse(bill.items)
@@ -199,7 +209,7 @@ class TestDomainObject(unittest.TestCase):
         bill.items += items
         self.assertTrue(bill.items == items)
 
-    # @unittest.skip('')
+    @unittest.skip('')
     def test_copy(self):
         class A(dobject):
             a1 = dattr(str)
@@ -249,6 +259,56 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(c1, c2)
         print(c1 , '\n', c2, sep='')
 
+    # @unittest.skip('')
+    def test_conform(self):
+        class A(dobject):
+            a1 = dattr(int)
+            a3 = dattr(int)
+            a4 = dattr(int)
+            identity(a1)
+
+        class B(dobject):
+            b1 = dattr(int)
+            b2 = doset(A)
+            b3 = dattr(int)
+            identity(b1)
+
+        class AA(dobject):
+            a1 = dattr(int)
+            a2 = dattr(int)
+            a4 = dattr(int)
+            identity(a1)
+
+        class BB(dobject):
+            b1 = dattr(int)
+            b2 = doset(AA)
+            b4 = dattr(int)
+            identity(b1)
+
+        
+        x = B(100)
+        x.b2 += [A(211, 213, 1), A(221, 223, 2), A(231, 233, 3)]
+
+        y = BB(500)
+        y.b2 += [AA(611, 213, 7), AA(221, 223, 8), AA(631, 233, 9)]
+        y.b4 = 501
+
+        print('     x = ', x, sep='') 
+        print('     y = ', y, sep='')
+        x <<= y # conform x to y
+        print('x <<= y: ', x, sep='')
+        self.assertEqual(x.b1, 500)
+        
+        self.assertEqual(x.b2[0].a1, 221)
+        self.assertEqual(x.b2[0].a4, 8)
+
+        self.assertEqual(x.b2[2].a1, 611)
+        self.assertIsNone(x.b2[2].a3)
+        self.assertEqual(x.b2[2].a4, 7)
+
+
+
+            
 
     # def test_dobject_eq(self):
     #     class A(dobject):

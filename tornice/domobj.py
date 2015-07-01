@@ -57,6 +57,7 @@ def identity(*fields):
 
 
 class DObjectMetaClass(type):
+
     @classmethod
     def __prepare__(metacls, name, bases, **kwargs): 
         return OrderedDict()
@@ -251,12 +252,12 @@ class doset(daggregate):
             self.__list.append(obj)
 
 
-    def remove(self, obj):
-        index = self.__map.get(obj._dobj_id)
-        if index is None:
-            raise ValueError("%r not in doset" % obj)
+    # def remove(self, obj):
+    #     index = self.__map.get(obj._dobj_id)
+    #     if index is None:
+    #         raise ValueError("%r not in doset" % obj)
 
-        del self.__list[index]
+    #     del self.__list[index]
 
     def clear(self):
         """clear all objects in aggregate"""
@@ -267,7 +268,17 @@ class doset(daggregate):
     def index(self, obj):
         """The index of the object in this aggregate"""
 
-        dobj_id = obj._dobj_id
+        if isinstance(obj, tuple):
+            dobj_id = obj
+        elif isinstance(obj, int):
+            pass
+        elif isinstance(obj, dobject):
+            dobj_id = obj._dobj_id
+        else:
+            errmsg = 'The type of object should be dobject, identity or int: %s'
+            errmsg %= obj.__class__.__name__
+            raise TypeError(errmsg)
+
         index = self.__map.get(dobj_id)
         if index is None:
             raise ValueError ('no value of the identity %r' % dobj_id)
@@ -279,6 +290,26 @@ class doset(daggregate):
         items = (item.copy() for item in self.__list)
         return doset(self.item_type, items)
 
+    def __ilshift__(self, target):
+        """ x <<= y, the domain object x conforms to y """        
+        for objid in list(self.__map):
+            if objid not in target.__map: # need to be deleted items
+                del self[objid]
+                continue
+
+            self[objid].__ilshift__(target[objid])
+
+        for objid in target.__map:
+            if objid in self.__map:
+                continue
+
+            # items that be inserted 
+            newval = self.item_type(**dict([z for z in zip(objid._fields, objid)]) )
+            newval.__ilshift__(target[objid])
+            self.append(newval)
+
+        return self
+    
     def __bool__(self):
         return bool(self.__list)
 
@@ -297,22 +328,75 @@ class doset(daggregate):
 
 
     def __getitem__(self, index):
-        if isinstance(index, slice):
-            return doset(self.item_type, self.__list.__getitem__(index))
+
+        if isinstance(index, dobject) or isinstance(index, tuple):
+            idx = self.index(index)
+            return self.__list[idx]
+
         elif isinstance(index, int):
             return self.__list[index]
+                    
+        elif isinstance(index, slice):
+            return doset(self.item_type, self.__list.__getitem__(index))
+
+        else:
+            errmsg = 'unknown index or slice %s(%r)'
+            errmsg %= (index.__class__.__name__, index)
+            raise TypeError(errmsg)
+
+    def __delitem__(self, index):
+
+        if isinstance(index, dobject) :
+            idx = self.index(index)
+            del self.__list[idx]
+            del self.__map[index._dobj_id]
+        
+        elif isinstance(index, tuple):
+            idx = self.index(index)
+            del self.__list[idx]
+            del self.__map[index]
+
+        elif isinstance(index, int):
+            item = self.__list[index]
+            del self.__list[index]
+            del self.__map[item._dobj_id]
+
+        elif isinstance(index, slice):
+            lst = [self.index(item) for item in self.__list.__getitem__(index)]
+            for idx in sorted(lst, reverse=True): # delete 
+                item = self.__list[idx]
+                del self.__list[idx]
+                del self.__map[item._dobj_id]
+        else:
+            errmsg = 'unknown index or slice %s(%r)'
+            errmsg %= (index.__class__.__name__, index)
+            raise TypeError(errmsg)
+
+    def __setitem__(self, index, value):
+        if not isinstance(value, dobject):
+            raise TypeError('The assigned value should be dobject')
+
+        if isinstance(index, int):
+            # if the identity of this indexed object is different, 
+            # rechange the identity with the new one.
+            oldval = self.__list[index]
+            
+            newval_id = value._dobj_id
+            oldval_id = oldval._dobj_id
+            if oldval_id != newval_id:
+                del self.__map[oldval_id]
+                self.__map[newval_id] = index
+
+            self.__list[index] = value
+
         elif isinstance(index, dobject):
-            dobj_id = index._dobj_id
-            index = self.__map.get(dobj_id)
-            if index is None:
-                raise KeyError('no identity : %r' % dobj_id)
-
-            return self.__list[index]
-
-
-        errmsg = 'unknown index or slice %s(%r)'
-        errmsg %= (index.__class__.__name__, index)
-        raise TypeError(errmsg)
+            self.__list[self.index(index) ] = value
+        elif isinstance(index, slice):
+            raise NotImplementedError()
+        else:
+            errmsg = 'unknown index or slice %s(%r)'
+            errmsg %= (index.__class__.__name__, index)
+            raise TypeError(errmsg)
 
 
     def __eq__(self, other):
@@ -339,13 +423,14 @@ class doset(daggregate):
 
 
 class DomainObject(metaclass=DObjectMetaClass):
+    pass
     
-    @property
-    def _pristine(self):
-        raise NotImplementedError()
+    # @property
+    # def _pristine(self):
+    #     raise NotImplementedError()
 
-    def _set_pristine(self):
-        raise NotImplementedError()
+    # def _set_pristine(self):
+    #     raise NotImplementedError()
     
 
 
@@ -472,21 +557,37 @@ class dobject(DomainObject):
 
         return self.__class__(**kwargs)
 
-    def conform(self, target):
-        pass
-
-    def _pristine(self):
-        "True if this object are not changed"
+    def __ilshift__(self, target):
         
-        if self.__dobj_orig:
-            return False
+        for attr_name in self.__attrs:
+            if attr_name not in target.__attrs:
+                continue
 
-        for field in self.__class__.__mro_fields__:
-            if isinstance(field.datatype, dobject):
-                if not self.__fields__[field.name]._pristine:
-                    return False
+            ths_val = self.__attrs[attr_name]
+            tgt_val = target.__attrs[attr_name]
+            if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject) :
+                ths_val.__ilshift__(tgt_val)
+                continue
 
-        return True
+            if self.__attrs[attr_name] == tgt_val:
+                continue
+
+            self.__attrs[attr_name] = tgt_val
+
+        return self
+
+    # def _pristine(self):
+    #     "True if this object are not changed"
+        
+    #     if self.__dobj_orig:
+    #         return False
+
+    #     for field in self.__class__.__mro_fields__:
+    #         if isinstance(field.datatype, dobject):
+    #             if not self.__fields__[field.name]._pristine:
+    #                 return False
+
+    #     return True
 
 
     @classmethod
