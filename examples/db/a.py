@@ -9,10 +9,9 @@ from datetime import date
 import datetime as dt
 import sys
 
-from domainics.domobj import dobject, identity, datt
 
 from domainics.dtable import DBSchema, dtable_merge
-from domainics.domobj import dset, dobject
+from domainics.domobj import dobject, dset, identity, datt
 from domainics import set_dsn, transaction, dbc
 from domainics.dtable import dtable, tcol, dsequence
 from domainics.db import dbc
@@ -33,21 +32,22 @@ class mm_po_item(dtable):
 
     identity(po_no, line_no)
 
+class seq_po(dsequence):
+    start = 10000
+    step  = 1
 
 class mm_po(dtable):
+    po_sn         = tcol(seq_po, null_ok=False)
     po_no         = tcol(str,  doc='purchase order number')
     po_date       = tcol(date, doc='P.O. date')
     vender_sn     = tcol(int,  doc='internal sn of vender')
     notes         = tcol(str,  doc='addtional notes')
 
-    identity(po_no)
+    identity(po_sn)
 
 class mm_vendor(dtable):
     vendor_sn = tcol(int)
 
-class seq_po(dsequence):
-    start = 10000
-    step  = 1
 
 
 
@@ -58,9 +58,30 @@ schema.add_module('__main__')
 schema.drop()
 schema.create()
 
+@transaction
+def test2():
+    mm = mm_po(po_no='P003')
+    s1 =  dset(item_type=mm_po)
+    s1.append(mm_po(po_no='P201'))
+    s1.append(mm_po(po_no='P202'))
+    s1.append(mm_po(po_no='P203'))
+
+    print(s1)
+    
+    dtable_merge(s1, None)
+    
+    print(s1)
+
 
 @transaction
 def test():
+    s = seq_po()
+    # s.value =100
+    print('100, ', bool(s))
+    s.value = '100'
+    print('200, ', bool(s))
+    print('ddd %d' % s)
+
     mm = mm_po('P003')
     print(mm)
 
@@ -110,5 +131,5 @@ def test():
 
 if __name__ == '__main__':
     # main()
-    test()
+    test2()
 

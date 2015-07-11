@@ -30,6 +30,8 @@ import inspect
 from collections import OrderedDict
 from collections import namedtuple
 
+import datetime as dt
+from decimal import Decimal
 
 def identity(*fields):
     """ """
@@ -147,11 +149,12 @@ class datt:
 
     __slots__ = ('name', 'datatype', 'default_expr', 'doc', 'is_identity')
 
-    def __init__(self, type=object, expr=None, doc=None):
+    def __init__(self, type=object, expr=None, default=None, doc=None):
         self.datatype     = type
         self.default_expr = expr
-        self.is_identity  = False
+        self.default      = default
         self.doc          = doc
+        self.is_identity  = False
 
 
     def __get__(self, instance, owner):
@@ -449,18 +452,6 @@ class dset(daggregate):
         # operator 'o.x += a', translate into o.x = o.x.__iadd__(a)
 
 
-class DomainObject(metaclass=DObjectMetaClass):
-    pass
-    
-    # @property
-    # def _pristine(self):
-    #     raise NotImplementedError()
-
-    # def _set_pristine(self):
-    #     raise NotImplementedError()
-    
-
-
 
 def cast_attr_value(attrname, val, datatype):
     if val is None:
@@ -476,7 +467,8 @@ def cast_attr_value(attrname, val, datatype):
         err %= (attrname, datatype, val, type(val).__name__)
         raise TypeError(err)            
 
-class dobject(DomainObject):
+
+class dobject(metaclass=DObjectMetaClass):
 
     def __new__(cls, *values, **kwvalues):
         """ 
@@ -495,15 +487,15 @@ class dobject(DomainObject):
         for n, f in cls._dobj_attrs.items():
             fields.append((n, f))  
 
-        seen = set()
-        fields = []
-        for c in cls.__mro__:
-            if c == dobject: 
-                break
+        # seen = set()
+        # fields = []
+        # for c in cls.__mro__:
+        #     if c == dobject: 
+        #         break
 
-            for n, f in c._dobj_fields.items():
-                seen.add(n)
-                fields.append((n, f))
+        #     for n, f in c._dobj_fields.items():
+        #         seen.add(n)
+        #         fields.append((n, f))
 
         for val in values:
             name, field = fields.pop(0)
@@ -519,11 +511,13 @@ class dobject(DomainObject):
                 val = kwvalues.pop(name, None)
                 val = cast_attr_value(name, val, attr.datatype)
                 if val is None: # default value
-                    expr = attr.default_expr
-                    if expr is not None:
-                        val = eval(expr)
-                    else:
-                        val = None
+                    if isinstance(attr.default, type):
+                        val = attr.default()
+                    elif isinstance(attr.default, 
+                            (str, int, float, Decimal, dt.date, dt.time, 
+                             dt.datetime, dt.timedelta)):
+                        val = attr.default
+
 
             attr_values[name] = val
 
@@ -610,52 +604,25 @@ class dobject(DomainObject):
 
         return self
 
-    # def _pristine(self):
-    #     "True if this object are not changed"
+
+    # @classmethod
+    # def __mro_fields__(cls):
         
-    #     if self.__dobj_orig:
-    #         return False
+    #     seen = set()
+    #     for field in cls.__fields__:
+    #         seen.add(field)
+    #         yield field
 
-    #     for field in self.__class__.__mro_fields__:
-    #         if isinstance(field.datatype, dobject):
-    #             if not self.__fields__[field.name]._pristine:
-    #                 return False
+    #     for c in cls.__mro__:
+    #         if cls == dobject:
+    #             break
 
-    #     return True
+    #         for field in c.__fields__:
+    #             if field in seen:
+    #                 continue
 
-
-    @classmethod
-    def __get_field__(cls, name):
-        
-        field = cls.__fields__.get(name, None)
-        if field: return field
-
-        for c in cls.__mro__:
-            if cls == dobject: break
-
-            field = c.__fields__.get(name, None)
-            if field: return field
-
-        return None
-
-    @classmethod
-    def __mro_fields__(cls):
-        
-        seen = set()
-        for field in cls.__fields__:
-            seen.add(field)
-            yield field
-
-        for c in cls.__mro__:
-            if cls == dobject:
-                break
-
-            for field in c.__fields__:
-                if field in seen:
-                    continue
-
-                seen.add(field)
-                yield field
+    #             seen.add(field)
+    #             yield field
 
 
 

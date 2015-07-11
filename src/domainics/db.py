@@ -7,6 +7,7 @@ _logger = logging.getLogger(__name__)
 import functools
 from collections  import OrderedDict as _OrderedDict
 from collections  import namedtuple  as _namedtuple
+from abc import abstractmethod
 
 from .util import nameddict   as _nameddict
 from .pillar import _pillar_history, pillar_class, PillarError
@@ -217,6 +218,10 @@ class BaseSQLBlock:
     @record_type.setter
     def record_type(self, val):
         self._record_type = val
+
+    @abstractmethod
+    def nextval(self, seq, batch_cnt=None):
+        raise NotImplemented()        
 
     def __dset__(self, item_type):
 

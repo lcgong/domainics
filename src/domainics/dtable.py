@@ -77,7 +77,15 @@ def repr_datatype(dtype, length):
 
     elif dtype == datetime.date:
         datatype = 'DATE'
-    
+
+    elif issubclass(dtype, dsequence):
+        if not length:
+            datatype = 'INTEGER'
+        elif length == 2:
+            datatype = 'SMALLINT'
+        elif length == 4:
+            datatype = 'BIGINT'
+
     if datatype:
         return datatype
 
@@ -111,12 +119,54 @@ class dtable(dobject):
 
 class tcol(datt):
 
-    def __init__(self, type, len=None, doc=None):
+    def __init__(self, datatype, len=None, null_ok=True, **kwargs):
         self.len = len
-        super(tcol, self).__init__(type, doc=doc)
 
-class dsequence(dobject):
-    pass
+        if issubclass(datatype, dsequence):
+            if kwargs.get('default') is not None or not null_ok:
+                kwargs['default'] = datatype
+
+        super(tcol, self).__init__(datatype, **kwargs)
+
+
+class dsequence:
+
+    def __init__(self):
+        self.__value = None
+
+    @property    
+    def value(self):
+        if self.__value is None:
+            err = 'The sequence number %s is not allocated'
+            err %= self.__class__.__name__
+            raise ValueError(err)
+
+        return self.__value
+
+    @value.setter
+    def value(self, newval):
+        if isinstance(newval, int):
+            self.__value = newval
+        else:
+            err = 'The sequence value should be int, not %s'
+            err %= newval.__class__.__name__
+            raise TypeError(err)
+
+    def __bool__(self):
+        return self.__value is not None
+
+    def __int__(self):
+        return self.value
+
+    def __hash__(self):
+        return super(dsequence, self).__hash__()
+
+    def __repr__(self):
+        if self.__value is not None:
+            return repr(self.__value)
+        else:
+            return self.__class__.__name__ + '(' + ')'
+
 
 
 
@@ -281,8 +331,34 @@ def pq_dtable_merge(current, past):
     dins, dchg, ddel = _dtable_diff(current, past)
     table_name = current.item_type.__name__
 
+    seq_attrs = {}
+    for n, f in current.item_type._dobj_attrs.items():
+        if issubclass(f.datatype, dsequence):
+            seq_attrs[n] = f
+
+
     if dins.values:
         cols = dins.pkeys + dins.fields
+        values = [k + v for k, v in zip(dins.pkvals, dins.values)]
+        if seq_attrs:
+            seq_cols = [] # (col_idx, col_name, [seq_value])
+            for i, colname in enumerate(cols):
+                if colname in seq_attrs:
+                    seq_cols.append((i, colname, []))
+
+            for record in values:
+                for seq_col in seq_cols:
+                    seq_val = record[seq_col[0]]
+                    if not seq_val:
+                        seq_col[2].append(seq_val)
+
+            for colidx, colname, seqvals in seq_cols:
+                seqname = seq_attrs[colname].datatype.__name__
+
+                newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
+
+                for seq, value in zip(seqvals, newvals):
+                    seq.value = value
         
         dbc << """
         INSERT INTO {table} ({cols}) 
@@ -291,7 +367,7 @@ def pq_dtable_merge(current, past):
                    cols=', '.join(cols), 
                    vals=', '.join(['%s'] * len(cols)))
         
-        dbc << [k + v for k, v in zip(dins.pkvals, dins.values)]
+        dbc << values
 
     if dchg.values:
         # generate update statment in a modified field group

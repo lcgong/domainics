@@ -4,15 +4,19 @@ import logging
 _logger = logging.getLogger(__name__)
 
 import re
-import psycopg2.pool
-import psycopg2.extras
-import psycopg2.extensions
 from psycopg2.pool import ThreadedConnectionPool
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
+
 
 from .db import BaseSQLBlock
+from .dtable import dsequence
 
+
+import psycopg2.extensions as _pgext 
+_pgext.register_type(_pgext.UNICODE)
+_pgext.register_type(_pgext.UNICODEARRAY)
+
+# register postgresql type dsequence
+_pgext.register_adapter(dsequence, lambda seq : _pgext.AsIs(repr(seq.value)))
 
 
 class PostgreSQLBlock(BaseSQLBlock):
@@ -46,7 +50,7 @@ class PostgreSQLBlock(BaseSQLBlock):
             self._conn = None
 
     def nextval(self, seq, batch_cnt=None):
-        cur = self.cursor
+        cur = self._cursor
         if batch_cnt is None :
             s = "SELECT nextval(%(seq)s)"
             cur.execute(s, dict(seq=seq))
@@ -64,3 +68,4 @@ class PostgreSQLBlock(BaseSQLBlock):
 
 
 _ptn_sqlparams = re.compile(r'%(?:s|\(\w+\)s)')
+
