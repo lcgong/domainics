@@ -5,7 +5,17 @@ import os.path
 import inspect
 import pkgutil
 import importlib
+
+import dpillars.web
+
 import tornado.web
+from tornado.log import access_log
+
+import mimetypes
+
+from .pillar import _pillar_history, pillar_class
+
+
 
 class RouteError:
     pass
@@ -67,11 +77,6 @@ def request_handler_def(path, handler_func, methods=None, fields=None, proto=Non
 
     module_routes.add_spec(fullpath, handler_class, None)
 
-
-from tornado.log import access_log
-import mimetypes
-
-from tornice.pillar import _pillar_history, pillar_class
 
 
 

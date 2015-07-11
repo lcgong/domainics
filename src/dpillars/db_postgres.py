@@ -3,7 +3,7 @@
 import logging
 _logger = logging.getLogger(__name__)
 
-
+import re
 import psycopg2.pool
 import psycopg2.extras
 import psycopg2.extensions
@@ -11,11 +11,15 @@ from psycopg2.pool import ThreadedConnectionPool
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-from tornice.db import BaseSQLBlock
+from dpillars.db import BaseSQLBlock
+
 
 
 class PostgreSQLBlock(BaseSQLBlock):
     _conn_pools = {}
+
+    def __init__(self, dsn='DEFAULT', autocommit=False, record_type=None):
+        super(PostgreSQLBlock, self).__init__('postgres', dsn, autocommit, record_type)
 
     @classmethod
     def set_dsn(cls, **kwargs):
@@ -53,3 +57,10 @@ class PostgreSQLBlock(BaseSQLBlock):
         cur.execute(s, dict(seq=seq, cnt=batch_cnt))
         return (r[0] for r in  cur.fetchall())
     
+
+    @staticmethod
+    def _has_params(sqlstmt):
+        return bool(_ptn_sqlparams.search(sqlstmt))
+
+
+_ptn_sqlparams = re.compile(r'%(?:s|\(\w+\)s)')

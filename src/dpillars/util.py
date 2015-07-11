@@ -3,6 +3,33 @@
 import sys as _sys
 from keyword import iskeyword as _iskeyword
 from collections import OrderedDict as _OrderedDict
+from pkgutil import walk_packages
+
+
+def iter_submodules(root_module, recursive=True):
+    """  """
+
+    if isinstance(root_module, str):
+        root_module = __import__(root_module)
+
+    if not hasattr(root_module, '__path__'):
+        yield root_module
+        return    
+
+    if isinstance(root_module.__path__, list): # no namespace package
+        yield root_module
+
+    if not recursive:
+        return
+
+
+    prefix = root_module.__name__ + '.'
+    for loader, module_name, ispkg in walk_packages(root_module.__path__, prefix):
+
+        module = loader.find_module(module_name).load_module(module_name)
+        if ispkg and not isinstance(module.__path__, list):
+            continue
+        yield module
 
 
 _nameddict_class_tmpl = """

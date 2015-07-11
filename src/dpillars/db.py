@@ -7,7 +7,8 @@ _logger = logging.getLogger(__name__)
 
 from collections  import OrderedDict as _OrderedDict
 from collections  import namedtuple  as _namedtuple
-from tornice.util import nameddict   as _nameddict
+
+from dpillars.util import nameddict   as _nameddict
 
 
 _dsn_class = {}
@@ -17,7 +18,7 @@ def set_dsn(**kwargs):
     dbsys = kwargs.pop('sys', 'postgres')
     dsn   = kwargs.get('dsn', 'DEFAULT')
     if dbsys in ('postgres', 'pgsql', 'pg') :
-        import tornice.db_postgres as _pg
+        import dpillars.db_postgres as _pg
 
         _dsn_class[dsn] = _pg.PostgreSQLBlock
         _pg.PostgreSQLBlock.set_dsn(**kwargs)
@@ -26,6 +27,8 @@ def set_dsn(**kwargs):
 
     elif dbsys in ('mysql'):
         raise NotImplemented('mysql')
+    else:
+        raise ValueError('unkown DBMS: ' + dbsys)
 
 def sqlblock(dsn='DEFAULT', autocommit=False, record_type=None):
     
@@ -53,14 +56,39 @@ def record_plainobj(cursor):
     for row in cursor:
         yield dt(*row)
 
+def make_record_dtable(dobj_cls):
+
+    attrnames = set(dobj_cls._dobj_attrs.keys())
+
+    def record_dtable(cursor):
+        nonlocal attrnames
+
+        fields = [d[0] for d in cursor.description or ()]
+        
+        colnames, colidxs = [], []
+        for i, f in enumerate(fields):
+            if f not in attrnames:
+                continue
+            colnames.append(f)
+            colidxs.append(i)
+        
+
+        dt = _nameddict("Row", [d[0] for d in cursor.description or ()])
+        # for row in cursor:
+        #     yield dobj_cls(**zip(colnames, (row[i] for i in colidxs))
 
 class BaseSQLBlock:
-    def __init__(self, dsn='DEFAULT', autocommit=False, record_type=None):
+    def __init__(self, dbtype, dsn='DEFAULT', autocommit=False, record_type=None):
         
         self._record_type = record_type or _default_record_type
 
+        self.dbtype = dbtype
         self.dsn = dsn
         self.autocommit = autocommit
+
+        self._cur_record_type = None
+        self.__todo_sqlstmt   = None
+        
                     
     def __enter__(self):
         self._open()
@@ -80,13 +108,87 @@ class BaseSQLBlock:
 
         return False
 
-    def __call__(self, sql, params=None, many_params=None):
-        if many_params is not None:
-            self._cursor.executemany(sql, many_params)
+    def __lshift__(self, stmt_or_params):
+        """push SQL statement or parameters to dbc. 
+
+        dbc << 'SELECT %s'
+        dbc << (100,) 
+
+        """
+        
+        if not stmt_or_params: # when '' or None is pushed, clear sql stmt
+            self.__todo_sqlstmt = None
+            return self
+
+        if isinstance(stmt_or_params, str): # sql stmt is pushed
+            if not self._has_params(stmt_or_params):
+                self.__todo_sqlstmt = None
+                self.__execute(stmt_or_params)
+                return
+            else:
+                self.__todo_sqlstmt = stmt_or_params
+            return self
+
+        # push params
+        if not self.__todo_sqlstmt:
+            err = 'NO SQL statement to solve the parameters: %r'
+            err %= stmt_or_params
+            raise ValueError(err)
+
+        if isinstance(stmt_or_params, list):
+            self.__execute(self.__todo_sqlstmt, many=stmt_or_params)
+            # self.__todo_sqlstmt = None
+        elif isinstance(stmt_or_params, tuple) or isinstance(stmt_or_params, dict):
+            self.__execute(self.__todo_sqlstmt, params=stmt_or_params)        
+            # self.__todo_sqlstmt = None
+        else:
+            err =  'statement should be strm and '
+            err += 'parameters should be a tuple, dict and list: %r'
+            err %= stmt_or_params
+            raise TypeError(err)
+
+        
+        return self
+
+    # def __imod__(self, params):
+    #     """push SQL params to dbc, and execute the pending sql. 
+    #     The params is a tuple or dict of parameters. 
+    #     If the params is a list, the many params are provided.
+    #     """
+    #     if not self.__todo_sqlstmt:
+    #         err = 'NO SQL statement to solve the parameters: %r'
+    #         err %= params
+    #         raise ValueError(err)
+
+    #     if isinstance(params, list):
+    #         self.__execute(self.__todo_sqlstmt, many=params)
+    #         # self.__todo_sqlstmt = None
+    #     elif isinstance(params, tuple) or isinstance(params, dict):
+    #         self.__execute(self.__todo_sqlstmt, params=params)        
+    #         # self.__todo_sqlstmt = None
+    #     else:
+    #         err = 'parameters should be a tuple, dict and list: %r'
+    #         err %= params
+    #         raise TypeError(err)
+
+    #     return self
+
+    # def __call__(self, sql, params=None, many=None):
+    #     if many is not None:
+    #         self._cursor.executemany(sql, many)
+    #     else:
+    #         self._cursor.execute(sql, params)
+
+    #     self._iter = None
+
+    def __execute(self, sql, params=None, many=None):
+        if many is not None:
+            self._cursor.executemany(sql, many)
         else:
             self._cursor.execute(sql, params)
 
         self._iter = None
+
 
     def __iter__(self):
         self._iter = self._record_type(self._cursor)
@@ -94,7 +196,14 @@ class BaseSQLBlock:
 
     def __next__(self):
         _iter = self._iter or self.__iter__()
-        return _iter.__next__()
+        try:
+            return _iter.__next__()
+        finally:
+            self._cur_record_type = None
+
+    # def cast(self, type):
+    #     if type is 
+    #     pass
 
     @property 
     def rowcount(self):
@@ -108,6 +217,40 @@ class BaseSQLBlock:
     def record_type(self, val):
         self._record_type = val
 
+    def __doset__(self, item_type):
+
+        dobj_attrs = item_type._dobj_attrs
+        colnames = []
+        selected = []
+        for i, d in enumerate(self._cursor.description):
+            colname = d[0]
+            if colname in dobj_attrs:
+                selected.append(i)
+            colnames.append(colname)
+
+        for record in self._cursor:
+            instance  = item_type()
+            attr_vals = getattr(instance, '_dobject__attrs')
+            for i in selected:
+                attr_vals[colnames[i]] = record[i]
+
+            yield instance
+
+    
+def _new_dobject(dobj_cls, attr_pairs):
+    """new dobject with attribute (name, value) pairs"""
+    
+    instance = dobj_cls()
+
+    attrs  = dobj_cls._dobj_attrs
+    values = getattr(instance, '__dobject_attrs')
+
+    for attr_name, attr_val in attr_pairs:
+        if attr_name in attrs:
+            values[attr_name] = attr_val
+
+    return instance
+
 _default_record_type = record_plainobj
 
 
@@ -116,7 +259,7 @@ from .pillar import _pillar_history, pillar_class, PillarError
 
 
 sql = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_pillar_history)
-psql = sqlite = mysql = sql
+dbc = psql = sqlite = mysql = sql
 
 
 def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
@@ -147,10 +290,10 @@ def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
                 def exit_callback(etyp, eval, tb):
                     sqlblk.__exit__(etyp, eval, tb)
 
-                func = _pillar_history.bound(func, [(sql, sqlblk)], exit_callback)
+                bound_func = _pillar_history.bound(func, [(sql, sqlblk)], exit_callback)
 
                 sqlblk.__enter__()
-                ret = func(**kwargs)
+                ret = bound_func(*args, **kwargs)
 
 
                 if hasattr(ret, '_pillar_history'):

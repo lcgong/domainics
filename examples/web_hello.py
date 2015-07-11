@@ -20,11 +20,17 @@ def hi(sid, page):
     handler.write("data: %r" % get_list())
 
 
+
 @transaction
 def get_list():
   psql("""
   SELECT * FROM (VALUES (1,2), (20,30)) s(a, b)
   """)
+
+  dbc <= """
+  SELECT * FROM (VALUES (1,2), (20,30)) s(a, b)
+  """
+  dbc %= (,)
 
   return list(psql)
 

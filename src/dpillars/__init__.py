@@ -2,8 +2,9 @@
 
 
 
-from .db import sql, psql, mysql, sqlite, with_sql, set_dsn
+from .db import sql, dbc, with_sql, set_dsn
 from .web import handler, route, route_base, WebApp
+
 
 request = route
 rest = route
