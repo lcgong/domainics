@@ -6,8 +6,6 @@ import inspect
 import pkgutil
 import importlib
 
-import dpillars.web
-
 import tornado.web
 from tornado.log import access_log
 

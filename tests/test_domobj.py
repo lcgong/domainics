@@ -3,7 +3,7 @@ import unittest
 
 import decimal
 import datetime as dt
-from tornice.domobj import dobject, dattr, identity, doset
+from tornice.domobj import dobject, datt, identity, dset
 
 
 
@@ -12,14 +12,14 @@ class TestDomainObject(unittest.TestCase):
     @unittest.skip('')
     def test_new(self):
         class A(dobject):
-            a = dattr(int, expr="100")
+            a = datt(int, expr="100")
 
         class B(A):
-            b = dattr(int, expr='201')
-            m = dattr(int, expr='202')
+            b = datt(int, expr='201')
+            m = datt(int, expr='202')
 
         class C(B):
-            c = dattr(int, expr='300')
+            c = datt(int, expr='300')
 
         c = C(310, 210, a=150)
         self.assertEqual(c.c, 310)
@@ -35,8 +35,8 @@ class TestDomainObject(unittest.TestCase):
     def test_identity(self):
 
         class A(dobject):
-            a_no = dattr(str, expr="'100'")
-            amt  = dattr(float)
+            a_no = datt(str, expr="'100'")
+            amt  = datt(float)
 
             identity(a_no)
 
@@ -46,9 +46,9 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(a._dobj_id, (200,))
 
         class A(dobject):
-            a_no = dattr(str, expr="'100'")
-            b_no = dattr(str, expr="'101'")
-            amt  = dattr(float)
+            a_no = datt(str, expr="'100'")
+            b_no = datt(str, expr="'101'")
+            amt  = datt(float)
 
             identity(a_no, b_no)
 
@@ -59,9 +59,9 @@ class TestDomainObject(unittest.TestCase):
 
 
         class A(dobject):
-            a_no = dattr(str, expr="'100'")
-            b_no = dattr(str, expr="'101'")
-            amt  = dattr(float)
+            a_no = datt(str, expr="'100'")
+            b_no = datt(str, expr="'101'")
+            amt  = datt(float)
 
         a = A()
         self.assertEqual(a._dobj_id_names, [])
@@ -69,10 +69,10 @@ class TestDomainObject(unittest.TestCase):
 
 
         class A(dobject):
-            no1 = dattr(int, expr="100")
-            no2 = dattr(int, expr="101")
-            amt = dattr(float)
-            age = dattr(int)
+            no1 = datt(int, expr="100")
+            no2 = datt(int, expr="101")
+            amt = datt(float)
+            age = datt(int)
 
             identity(no1, no2)
 
@@ -83,10 +83,10 @@ class TestDomainObject(unittest.TestCase):
         self.assertNotEqual(a2, a3)
 
         class A(dobject):
-            no1 = dattr(int, expr="100")
-            no2 = dattr(int, expr="101")
-            amt = dattr(float)
-            age = dattr(int)
+            no1 = datt(int, expr="100")
+            no2 = datt(int, expr="101")
+            amt = datt(float)
+            age = datt(int)
 
         a1 = A(no1=100, no2=200, amt=3333, age=30)
         a2 = A(no1=100, no2=200, amt=2222, age=30)
@@ -101,8 +101,8 @@ class TestDomainObject(unittest.TestCase):
     def test_identity_setattr(self):
 
         class A(dobject):
-            no1 = dattr(int, expr="'100'")
-            amt = dattr(float)
+            no1 = datt(int, expr="'100'")
+            amt = datt(float)
 
             identity(no1)
 
@@ -112,7 +112,7 @@ class TestDomainObject(unittest.TestCase):
 
 
         class A(dobject):
-            no1 = dattr(str, expr="'100'")
+            no1 = datt(str, expr="'100'")
 
         a = A(100) # implict casting
         self.assertEqual(a.no1, '100') 
@@ -126,22 +126,22 @@ class TestDomainObject(unittest.TestCase):
 
 
         class A(dobject):
-            no1 = dattr(float)
+            no1 = datt(float)
 
         with self.assertRaises(TypeError):
             a = A('dddd')
 
 
     @unittest.skip('')
-    def test_doset(self):
+    def test_dset(self):
         class A(dobject):
-            n1 = dattr(int)
-            n2 = dattr(int)
-            n3 = dattr(int)
+            n1 = datt(int)
+            n2 = datt(int)
+            n3 = datt(int)
             
             identity(n1, n2)
 
-        s1 = doset(A)
+        s1 = dset(A)
         s1.append(A(100, 100, 901))
         s1.append(A(101, 100, 902))
         s1.append(A(102, 100, 903))
@@ -157,32 +157,32 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(s1.index(A(101, 100)), 1)
         
         # slice
-        self.assertEqual(s1[:2], doset([A(100, 100, 901), A(101, 100, 902)]))
+        self.assertEqual(s1[:2], dset([A(100, 100, 901), A(101, 100, 902)]))
         
 
     @unittest.skip('')
-    def test_doset(self):
+    def test_dset(self):
         class Item(dobject):
-            item_no = dattr(str)
-            amt     = dattr(float)
+            item_no = datt(str)
+            amt     = datt(float)
             identity(item_no)
 
         class Bill(dobject):
-            doc_no = dattr(str)
-            items  = doset(Item)
+            doc_no = datt(str)
+            items  = dset(Item)
             identity(doc_no)
 
         bill = Bill(doc_no='123')
         bill.items.append(Item('no001', 100.0))
         bill.items.append(Item('no002', 110.0))
 
-        items = doset(Item, [Item('no001', 100.0), 
+        items = dset(Item, [Item('no001', 100.0), 
                         Item('no002', 110.0)])
 
         self.assertEqual(bill.items, items)
 
 
-        items = doset(Item, [
+        items = dset(Item, [
                         Item('no001', 100.0), 
                         Item('no002', 110.0),
                         Item('no003', 111.0)])
@@ -212,10 +212,10 @@ class TestDomainObject(unittest.TestCase):
     @unittest.skip('')
     def test_copy(self):
         class A(dobject):
-            a1 = dattr(str)
-            a2 = dattr(int)
-            a3 = dattr(decimal.Decimal)
-            a4 = dattr(dt.date)
+            a1 = datt(str)
+            a2 = datt(int)
+            a3 = datt(decimal.Decimal)
+            a4 = datt(dt.date)
 
         a1 = A('abc', 100, '13.4', dt.date(2015,7,1))
         a2 = a1.copy()
@@ -223,8 +223,8 @@ class TestDomainObject(unittest.TestCase):
         self.assertIsNot(a1, a2)
 
         class B(dobject):
-            b0 = dattr(str)
-            b1 = dattr(A)
+            b0 = datt(str)
+            b1 = datt(A)
 
         b1 = B('xyz01')
         b1.b1 = A('abc', 100, '13.4', dt.date(2015,7,1))
@@ -236,19 +236,19 @@ class TestDomainObject(unittest.TestCase):
         self.assertEqual(b1.b1, b2.b1)
 
         class A(dobject):
-            a1 = dattr(str)
-            a2 = dattr(int)
+            a1 = datt(str)
+            a2 = datt(int)
 
         class B(dobject):
-            b1 = dattr(dt.date)
-            b2 = dattr(decimal.Decimal)
+            b1 = datt(dt.date)
+            b2 = datt(decimal.Decimal)
 
             identity(b1)
             
         class C(dobject):
-            c1    = dattr(int)
-            props = dattr(A)
-            dates = doset(B)
+            c1    = datt(int)
+            props = datt(A)
+            dates = dset(B)
 
         c1 = C(100)
         c1.props = A('abc', 2100)
@@ -262,27 +262,27 @@ class TestDomainObject(unittest.TestCase):
     # @unittest.skip('')
     def test_conform(self):
         class A(dobject):
-            a1 = dattr(int)
-            a3 = dattr(int)
-            a4 = dattr(int)
+            a1 = datt(int)
+            a3 = datt(int)
+            a4 = datt(int)
             identity(a1)
 
         class B(dobject):
-            b1 = dattr(int)
-            b2 = doset(A)
-            b3 = dattr(int)
+            b1 = datt(int)
+            b2 = dset(A)
+            b3 = datt(int)
             identity(b1)
 
         class AA(dobject):
-            a1 = dattr(int)
-            a2 = dattr(int)
-            a4 = dattr(int)
+            a1 = datt(int)
+            a2 = datt(int)
+            a4 = datt(int)
             identity(a1)
 
         class BB(dobject):
-            b1 = dattr(int)
-            b2 = doset(AA)
-            b4 = dattr(int)
+            b1 = datt(int)
+            b2 = dset(AA)
+            b4 = datt(int)
             identity(b1)
 
         
@@ -312,18 +312,18 @@ class TestDomainObject(unittest.TestCase):
 
     # def test_dobject_eq(self):
     #     class A(dobject):
-    #         no = dattr(int, expr='1001')
+    #         no = datt(int, expr='1001')
 
     #     class B(dobject):
-    #         no = dattr(int, expr='1001')
+    #         no = datt(int, expr='1001')
 
     #     a1, a2, b = A(), A(), B()
     #     self.assertEqual(a1, a2)
     #     self.assertEqual(a1, b) # ducking equivalent
 
     #     class B(dobject):
-    #         no = dattr(int, expr='1001')
-    #         sn = dattr(int, expr='1000')
+    #         no = datt(int, expr='1001')
+    #         sn = datt(int, expr='1000')
 
     #     a, b = A(), B()
     #     self.assertNotEqual(a, b)
@@ -342,14 +342,14 @@ class TestDomainObject(unittest.TestCase):
     #     self.assertEqual(len(b1.__orig__), 0)
     #     self.assertEqual(b1, b2)        
 
-    # def test_dattr_is_dobject(self):
+    # def test_datt_is_dobject(self):
 
     #     class A(dobject):
-    #         no = dattr(int, expr='1001')
+    #         no = datt(int, expr='1001')
 
     #     class B(dobject):
-    #         sn = dattr(int)
-    #         a  = dattr(A, expr="A(no=123)", doc='A domain object')
+    #         sn = datt(int)
+    #         a  = datt(A, expr="A(no=123)", doc='A domain object')
 
     #     b1, b2 = B(sn=1001, a=A(no=2001)), B(sn=1001, a=A(no=2001))
     #     self.assertEqual(b1, b2)                

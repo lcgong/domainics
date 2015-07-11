@@ -11,7 +11,7 @@ from psycopg2.pool import ThreadedConnectionPool
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
-from dpillars.db import BaseSQLBlock
+from .db import BaseSQLBlock
 
 
 

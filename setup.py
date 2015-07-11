@@ -6,13 +6,13 @@ from setuptools import find_packages
 
 
 setup(
-    name='dpillars',
+    name='domainics',
     version='0.1',
     license="BSD",
-    description='RESTful Framework with domain object',
+    description='RESTful Framework with domain objects and pillars',
     author='Chenggong Lyu',
     author_email='lcgong@gmail.com',
-    url='https://github.com/lcgong/dpillars',
+    url='https://github.com/lcgong/domainics',
     packages=find_packages("src"),
     package_dir = {"": "src"},
     zip_safe = False,

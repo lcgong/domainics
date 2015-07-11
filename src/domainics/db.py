@@ -4,11 +4,12 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-
+import functools
 from collections  import OrderedDict as _OrderedDict
 from collections  import namedtuple  as _namedtuple
 
-from dpillars.util import nameddict   as _nameddict
+from .util import nameddict   as _nameddict
+from .pillar import _pillar_history, pillar_class, PillarError
 
 
 _dsn_class = {}
@@ -18,7 +19,7 @@ def set_dsn(**kwargs):
     dbsys = kwargs.pop('sys', 'postgres')
     dsn   = kwargs.get('dsn', 'DEFAULT')
     if dbsys in ('postgres', 'pgsql', 'pg') :
-        import dpillars.db_postgres as _pg
+        import domainics.db_postgres as _pg
 
         _dsn_class[dsn] = _pg.PostgreSQLBlock
         _pg.PostgreSQLBlock.set_dsn(**kwargs)
@@ -217,7 +218,7 @@ class BaseSQLBlock:
     def record_type(self, val):
         self._record_type = val
 
-    def __doset__(self, item_type):
+    def __dset__(self, item_type):
 
         dobj_attrs = item_type._dobj_attrs
         colnames = []
@@ -254,8 +255,6 @@ def _new_dobject(dobj_cls, attr_pairs):
 _default_record_type = record_plainobj
 
 
-import functools
-from .pillar import _pillar_history, pillar_class, PillarError
 
 
 sql = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_pillar_history)

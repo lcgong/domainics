@@ -7,7 +7,7 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
 from .util import iter_submodules
-from .domobj import DObjectMetaClass, dobject, doset
+from .domobj import DObjectMetaClass, dobject, dset
 
 from . import transaction, dbc
 
@@ -175,31 +175,31 @@ def _dtable_diff(current, past=None):
     if current is None and past is None:
         return
 
-    if current is not None and not isinstance(current, doset):
+    if current is not None and not isinstance(current, dset):
         if not isinstance(current, dobject):
-            err = 'The current object should be dobject or doset type: %s'
+            err = 'The current object should be dobject or dset type: %s'
             err %= current.__class__.__name__
             raise TypeError(err)
 
-        dos = doset(item_type=current.__class__)
+        dos = dset(item_type=current.__class__)
         dos.append(current)
         current = dos
 
-    if past is not None and not isinstance(past, doset):
+    if past is not None and not isinstance(past, dset):
         if not isinstance(current, dobject):
-            err = 'The past object should be dobject or doset type: %s'
+            err = 'The past object should be dobject or dset type: %s'
             err %= past.__class__.__name__
             raise TypeError(err)
 
-        dos = doset(item_type=past.__class__)
+        dos = dset(item_type=past.__class__)
         dos.append(past)
         past = dos
 
     if current is None:
-        current = doset(item_type=past.item_type)
+        current = dset(item_type=past.item_type)
 
     if past is None:
-        past = doset(item_type=current.item_type)
+        past = dset(item_type=current.item_type)
 
     inslst = [] # the objects to be inserted
     dellst = [] # the objid to be deleted

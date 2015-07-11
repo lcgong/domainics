@@ -2,22 +2,22 @@
 
 
 """
-Domain:
-A sphere of knowledge (ontology), influence, or activity. The subject area
+Domain: 
+A sphere of knowledge (ontology), influence, or activity. The subject area 
 to which the user applies a program is the domain of the software.
 
-Entity:
-An object that is not defined by its attributes, but rather by a thread of
+Entity: 
+An object that is not defined by its attributes, but rather by a thread of 
 continuity and its identity.
 
-Value Object:
-An object that contains attributes but has no conceptual identity.
+Value Object: 
+An object that contains attributes but has no conceptual identity. 
 They should be treated as immutable.
 
-Aggregate:
-A collection of objects that are bound together by a root entity,
-otherwise known as an aggregate root.
-The aggregate root guarantees the consistency of changes being made within the aggregate
+Aggregate: 
+A collection of objects that are bound together by a root entity, 
+otherwise known as an aggregate root. 
+The aggregate root guarantees the consistency of changes being made within the aggregate 
 by forbidding external objects from holding references to its members.
 
 """
@@ -45,10 +45,10 @@ def identity(*fields):
 
     pks = []
     for field in fields:
-        if not isinstance(field, dattr):
-            errmsg = 'the primary key \'%s\' is not dattr' % field
+        if not isinstance(field, datt):
+            errmsg = 'the primary key \'%s\' is not datt' % field
             raise TypeError(errmsg)
-
+        
         pks.append(field)
         field.is_identity = True
 
@@ -59,7 +59,7 @@ def identity(*fields):
 class DObjectMetaClass(type):
 
     @classmethod
-    def __prepare__(metacls, name, bases, **kwargs):
+    def __prepare__(metacls, name, bases, **kwargs): 
         return OrderedDict()
 
     def __new__(metacls, classname, bases, class_dict):
@@ -77,25 +77,23 @@ class DObjectMetaClass(type):
 
 
         fields = OrderedDict()
-        # set all names of domain field
+        # set all names of domain field 
         for name in class_dict:
             attr = class_dict[name]
-            if isinstance(attr, dattr):
+            if isinstance(attr, datt):
                 attr.name    = name
                 fields[name] = attr
-            elif isinstance(attr, doset):
-                # In class-block, doset is used, replace it with AggregateAttr
-                attr = AggregateAttr(doset, attr.item_type, attr.__doc__)
+            elif isinstance(attr, dset):
+                # In class-block, dset is used, replace it with AggregateAttr
+                attr = AggregateAttr(dset, attr.item_type, attr.__doc__)
                 attr.name        = name
                 class_dict[name] = attr
                 fields[name]     = attr
 
 
-
-
         cls = type.__new__(metacls, classname, bases, class_dict)
         cls._dobj_fields = fields
-
+        
         id_fields = [p.name for p in pkeys]
         cls._dobj_id_names = id_fields
 
@@ -112,14 +110,17 @@ class DObjectMetaClass(type):
                     val = getattr(self, attrname)
                     if val is None:
                         errmsg = "The id-attribute '%s' cannot be none" % attrname
-                        raise TypeError(errmsg)
+                        raise TypeError(errmsg) 
                     values.append(val)
                 return id_type(*values)
-
+            
             return None
 
-        cls._dobj_id    = property(_get_dobj_id)
+        cls._dobj_id = property(_get_dobj_id)
+
+
         return cls
+
 
     @property
     def _dobj_attrs(cls):
@@ -140,7 +141,8 @@ class DObjectMetaClass(type):
         setattr(cls, '__dobj_attr_dict', mro_attrs)
         return mro_attrs
 
-class dattr:
+
+class datt:
     """ """
 
     __slots__ = ('name', 'datatype', 'default_expr', 'doc', 'is_identity')
@@ -156,7 +158,7 @@ class dattr:
         if instance is None: # get domain field
             return self
 
-        val = getattr(instance, '_dobject__attrs').get(self.name)
+        val = getattr(instance, '_dobject__attrs').get(self.name, None)
         return val
 
     def __set__(self, instance, value):
@@ -166,7 +168,7 @@ class dattr:
             raise TypeError(errmsg)
 
         value = cast_attr_value(name, value, self.datatype)
-
+  
 
         attrs  = getattr(instance, '_dobject__attrs')
         now_val = attrs.get(name, None)
@@ -218,15 +220,16 @@ class AggregateAttr:
             errmsg = "The aggregate object %s should be %s type, instead of %s"
             errmsg %= (self.name, self.agg_type.__name__, value.__class__.__name__)
             raise TypeError(errmsg)
-
-
+        
+        
         oldval.clear()
         for r in value:
             oldval.append(r)
 
+class daggregate:
+    pass
 
-
-class doset:
+class dset(daggregate):
     """
     The aggregate object set of domain object.
     """
@@ -243,29 +246,30 @@ class doset:
         self.__attr_doc  = doc
 
         if iterable is not None:
-            if hasattr(iterable, '__doset__'):
-                doset_iter = getattr(iterable, '__doset__')
-                for obj in doset_iter(item_type):
+            if hasattr(iterable, '__dset__'):
+                dset_iter = getattr(iterable, '__dset__')
+                for obj in dset_iter(item_type):
                     self.append(obj)
             else:
                 for obj in iterable:
                     self.append(obj)
 
+    
     def append(self, obj):
         """
-        If the identity of obj has been appened, replace the old one with it.
+        If the identity of obj has been appened, replace the old one with it. 
         """
         if not isinstance(obj, self.item_type):
-            errmsg = "The aggregate object should be '%s' type"
+            errmsg = "The aggregate object should be '%s' type" 
             errmsg %= self.item_type.__name__
             raise TypeError(errmsg)
 
         obj_id = obj._dobj_id
         if not obj_id:
-            errmsg = "The identity(%s) of %s is required"
+            errmsg = "The identity(%s) of %s is required" 
             errmsg %= (','.join(self.__class__._dobj_id_names, self.__class__.__name__))
             raise TypeError(errmsg)
-
+        
         if obj_id in self.__map:
             index = self.__map[obj_id]
             self.__list[index] = obj
@@ -278,7 +282,7 @@ class doset:
     # def remove(self, obj):
     #     index = self.__map.get(obj._dobj_id)
     #     if index is None:
-    #         raise ValueError("%r not in doset" % obj)
+    #         raise ValueError("%r not in dset" % obj)
 
     #     del self.__list[index]
 
@@ -311,10 +315,10 @@ class doset:
         """get a copy of the aggregate object and copies of its items"""
 
         items = (item.copy() for item in self.__list)
-        return doset(self.item_type, items)
+        return dset(self.item_type, items)
 
     def __ilshift__(self, target):
-        """ x <<= y, the domain object x conforms to y """
+        """ x <<= y, the domain object x conforms to y """        
         for objid in list(self.__map):
             if objid not in target.__map: # need to be deleted items
                 del self[objid]
@@ -326,13 +330,13 @@ class doset:
             if objid in self.__map:
                 continue
 
-            # items that be inserted
+            # items that be inserted 
             newval = self.item_type(**dict([z for z in zip(objid._fields, objid)]) )
             newval.__ilshift__(target[objid])
             self.append(newval)
 
         return self
-
+    
     def __bool__(self):
         return bool(self.__list)
 
@@ -344,7 +348,7 @@ class doset:
             yield itemobj
 
     def __repr__(self):
-        s = 'doset('
+        s = 'dset('
         s += ', '.join([repr(obj) for obj in self.__list])
         s += ')'
         return s
@@ -358,9 +362,9 @@ class doset:
 
         elif isinstance(index, int):
             return self.__list[index]
-
+                    
         elif isinstance(index, slice):
-            return doset(self.item_type, self.__list.__getitem__(index))
+            return dset(self.item_type, self.__list.__getitem__(index))
 
         else:
             errmsg = 'unknown index or slice %s(%r)'
@@ -373,7 +377,7 @@ class doset:
             idx = self.index(index)
             del self.__list[idx]
             del self.__map[index._dobj_id]
-
+        
         elif isinstance(index, tuple):
             idx = self.index(index)
             del self.__list[idx]
@@ -386,7 +390,7 @@ class doset:
 
         elif isinstance(index, slice):
             lst = [self.index(item) for item in self.__list.__getitem__(index)]
-            for idx in sorted(lst, reverse=True): # delete
+            for idx in sorted(lst, reverse=True): # delete 
                 item = self.__list[idx]
                 del self.__list[idx]
                 del self.__map[item._dobj_id]
@@ -400,10 +404,10 @@ class doset:
             raise TypeError('The assigned value should be dobject')
 
         if isinstance(index, int):
-            # if the identity of this indexed object is different,
+            # if the identity of this indexed object is different, 
             # rechange the identity with the new one.
             oldval = self.__list[index]
-
+            
             newval_id = value._dobj_id
             oldval_id = oldval._dobj_id
             if oldval_id != newval_id:
@@ -423,7 +427,7 @@ class doset:
 
 
     def __eq__(self, other):
-        if isinstance(other, doset):
+        if isinstance(other, dset):
             other_iter = other.__list
         elif isinstance(other, list) or isinstance(other, tuple):
             other_iter = other
@@ -437,7 +441,7 @@ class doset:
 
 
     def __iadd__(self, iterable) :
-
+        
         for obj in iterable:
             self.append(obj)
 
@@ -447,14 +451,14 @@ class doset:
 
 class DomainObject(metaclass=DObjectMetaClass):
     pass
-
+    
     # @property
     # def _pristine(self):
     #     raise NotImplementedError()
 
     # def _set_pristine(self):
     #     raise NotImplementedError()
-
+    
 
 
 
@@ -470,46 +474,37 @@ def cast_attr_value(attrname, val, datatype):
     except ValueError as ex:
         err = "The attribute '%s' should be \'%s\' type: value=%r(%s)"
         err %= (attrname, datatype, val, type(val).__name__)
-        raise TypeError(err)
-
-
+        raise TypeError(err)            
 
 class dobject(DomainObject):
 
     def __new__(cls, *values, **kwvalues):
-        """
+        """ 
         ordinal value: in defined order and mro
         """
-        
+
         instance = super(dobject, cls).__new__(cls)
         attr_values = OrderedDict()
-        setattr(instance, '__dobject_attrs', attr_values)
-        setattr(instance, '__dobject_orig',  {}) # original values
-
-        print(instance.__class__._dobj_id)
-        print(getattr(instance, '_dobj_id'))
-
-        instance._dobj_id
-
+        setattr(instance, '_dobject__attrs', attr_values)
+        setattr(instance, '_dobject__orig',  {}) # original values
 
         if not values and not kwvalues:
             return instance
 
-        # seen = set()
-        # fields = []
-        # for c in cls.__mro__:
-        #     if c == dobject:
-        #         break
-
-        #     for n, f in c._dobj_fields.items():
-        #         seen.add(n)
-        #         fields.append((n, f))
-
         fields = []
         for n, f in cls._dobj_attrs.items():
-            fields.append((n, f))            
+            fields.append((n, f))  
 
-        
+        seen = set()
+        fields = []
+        for c in cls.__mro__:
+            if c == dobject: 
+                break
+
+            for n, f in c._dobj_fields.items():
+                seen.add(n)
+                fields.append((n, f))
+
         for val in values:
             name, field = fields.pop(0)
             attr_values[name] = cast_attr_value(name, val, field.datatype)
@@ -533,22 +528,16 @@ class dobject(DomainObject):
             attr_values[name] = val
 
         if kwvalues:
-            errmsg = 'not defined field: '
+            errmsg = 'not defined field: ' 
             errmsg += ', '.join([f for f in kwvalues])
             raise ValueError(errmsg)
 
         instance._dobj_id
 
-        # if cls._dobj_id_names: # id-attr should be not-NONE
-        #     for attrname in cls._dobj_id_names:
-        #         if getattr(self, attrname) is None:
-        #             errmsg = "The id-attribute '%s' cannot be none" % attrname
-        #             raise TypeError(errmsg)
-
         return instance
 
     def __getattr__(self, name):
-        errmsg ='The domain object %s has no field: %s '
+        errmsg ='The domain object %s has no field: %s ' 
         errmsg %= (self.__class__.__name__, name)
         raise AttributeError(errmsg)
 
@@ -564,7 +553,7 @@ class dobject(DomainObject):
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
     def __eq__(self, other) :
-        ''' ducking equals:
+        ''' ducking equals: 
         1. True if the identity of this object equals that of other;
         2. True if all of fields of this object equal those of other '''
 
@@ -585,7 +574,7 @@ class dobject(DomainObject):
         for name, val in self.__attrs.items():
             if val != other.__attrs[name]:
                 return False
-
+        
         return True
 
     def copy(self):
@@ -603,7 +592,7 @@ class dobject(DomainObject):
         return self.__class__(**kwargs)
 
     def __ilshift__(self, target):
-
+        
         for attr_name in self.__attrs:
             if attr_name not in target.__attrs:
                 continue
@@ -623,7 +612,7 @@ class dobject(DomainObject):
 
     # def _pristine(self):
     #     "True if this object are not changed"
-
+        
     #     if self.__dobj_orig:
     #         return False
 
@@ -637,7 +626,7 @@ class dobject(DomainObject):
 
     @classmethod
     def __get_field__(cls, name):
-
+        
         field = cls.__fields__.get(name, None)
         if field: return field
 
@@ -648,5 +637,25 @@ class dobject(DomainObject):
             if field: return field
 
         return None
+
+    @classmethod
+    def __mro_fields__(cls):
+        
+        seen = set()
+        for field in cls.__fields__:
+            seen.add(field)
+            yield field
+
+        for c in cls.__mro__:
+            if cls == dobject:
+                break
+
+            for field in c.__fields__:
+                if field in seen:
+                    continue
+
+                seen.add(field)
+                yield field
+
 
 

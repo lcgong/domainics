@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from decimal import Decimal
-from dpillars.domobj import dobject, identity, dattr
 from datetime import date
 
 
@@ -10,16 +9,17 @@ from datetime import date
 import datetime as dt
 import sys
 
+from domainics.domobj import dobject, identity, datt
 
-from dpillars.dtable import DBSchema, dtable_merge
-from dpillars.domobj import doset, dobject
-from dpillars import set_dsn, transaction, sql, dbc
-from dpillars.dtable import dtable, dsequence
-from dpillars.db import dbc
+from domainics.dtable import DBSchema, dtable_merge
+from domainics.domobj import dset, dobject
+from domainics import set_dsn, transaction, sql, dbc
+from domainics.dtable import dtable, dsequence
+from domainics.db import dbc
 
 set_dsn(sys='postgres', database="demo", host='localhost', user='postgres')
 
-class tcol(dattr):
+class tcol(datt):
 
     def __init__(self, type, len=None, doc=None):
         self.len = len
@@ -80,7 +80,7 @@ def test():
 
     dbc << 'select 100'
 
-    s1 =  doset(item_type=mm_po)
+    s1 =  dset(item_type=mm_po)
     s1.append(mm_po(po_no='P001', po_date=dt.date(2015,7,1), notes='abc'))
     s1.append(mm_po(po_no='P002', po_date=dt.date(2015,7,2), notes='xyz'))
     s1.append(mm_po(po_no='P004', po_date=dt.date(2015,7,4), notes='hij'))
@@ -103,7 +103,7 @@ def test():
     po_no = 'P001'
 
     dbc << 'SELECT * FROM mm_po WHERE po_no=%s' 
-    po_old = doset(mm_po, dbc << (po_no,))
+    po_old = dset(mm_po, dbc << (po_no,))
 
     po_new = po_old.copy()
     po_new[0].notes = 'test2-123'
