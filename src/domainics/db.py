@@ -256,12 +256,10 @@ _default_record_type = record_plainobj
 
 
 
+_SQLPillar = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])
+dbc = _SQLPillar(_pillar_history)
 
-sql = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])(_pillar_history)
-dbc = psql = sqlite = mysql = sql
-
-
-def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
+def transaction(*d_args, dsn='DEFAULT', autocommit=False):
     """ 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
     
     @with_sql
@@ -280,7 +278,7 @@ def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
     def _decorator(func):
         def sqlblock_wrapper(*args, **kwargs):
 
-            if sql._this_object is not None: 
+            if dbc._this_object is not None: 
                 # no allow to reenter a new transaction
                 func(*args, **kwargs)
             else:
@@ -289,7 +287,8 @@ def with_sql(*d_args, dsn='DEFAULT', autocommit=False):
                 def exit_callback(etyp, eval, tb):
                     sqlblk.__exit__(etyp, eval, tb)
 
-                bound_func = _pillar_history.bound(func, [(sql, sqlblk)], exit_callback)
+                bound_func = _pillar_history.bound(func, 
+                                            [(dbc, sqlblk)], exit_callback)
 
                 sqlblk.__enter__()
                 ret = bound_func(*args, **kwargs)

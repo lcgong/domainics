@@ -13,17 +13,12 @@ from domainics.domobj import dobject, identity, datt
 
 from domainics.dtable import DBSchema, dtable_merge
 from domainics.domobj import dset, dobject
-from domainics import set_dsn, transaction, sql, dbc
-from domainics.dtable import dtable, dsequence
+from domainics import set_dsn, transaction, dbc
+from domainics.dtable import dtable, tcol, dsequence
 from domainics.db import dbc
 
 set_dsn(sys='postgres', database="demo", host='localhost', user='postgres')
 
-class tcol(datt):
-
-    def __init__(self, type, len=None, doc=None):
-        self.len = len
-        super(tcol, self).__init__(type, doc=doc)
 
 class mm_po_item(dtable):
     po_no   = tcol(str) 

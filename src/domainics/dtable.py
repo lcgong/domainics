@@ -6,10 +6,10 @@ from decimal import Decimal
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
-from .util import iter_submodules
-from .domobj import DObjectMetaClass, dobject, dset
-
 from . import transaction, dbc
+from .util import iter_submodules
+from .domobj import DObjectMetaClass, dobject, datt, dset
+
 
 
 def repr_create_table(dobj_cls):
@@ -105,8 +105,15 @@ def repr_drop_sequence(dobj_cls):
     s %= dobj_cls.__name__
     yield s
 
+
 class dtable(dobject):
     pass
+
+class tcol(datt):
+
+    def __init__(self, type, len=None, doc=None):
+        self.len = len
+        super(tcol, self).__init__(type, doc=doc)
 
 class dsequence(dobject):
     pass
