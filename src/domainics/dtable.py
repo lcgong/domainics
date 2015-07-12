@@ -10,6 +10,19 @@ from . import transaction, dbc
 from .util import iter_submodules
 from .domobj import DObjectMetaClass, dobject, datt, dset
 
+class dtable(dobject):
+    pass
+
+class tcol(datt):
+
+    def __init__(self, datatype, len=None, null_ok=True, **kwargs):
+        self.len = len
+
+        if issubclass(datatype, dsequence):
+            if kwargs.get('default') is not None or not null_ok:
+                kwargs['default'] = datatype
+
+        super(tcol, self).__init__(datatype, **kwargs)
 
 
 def repr_create_table(dobj_cls):
@@ -114,25 +127,18 @@ def repr_drop_sequence(dobj_cls):
     yield s
 
 
-class dtable(dobject):
-    pass
-
-class tcol(datt):
-
-    def __init__(self, datatype, len=None, null_ok=True, **kwargs):
-        self.len = len
-
-        if issubclass(datatype, dsequence):
-            if kwargs.get('default') is not None or not null_ok:
-                kwargs['default'] = datatype
-
-        super(tcol, self).__init__(datatype, **kwargs)
-
 
 class dsequence:
 
-    def __init__(self):
-        self.__value = None
+    def __init__(self, value=None):
+        if value is None or isinstance(value, int):
+            self.__value = value
+        elif isinstance(value, str):
+            self.__value = int(value)
+        else:
+            err = 'dsequence should be integer, not %s'
+            err %= value.__class__.__name__
+            raise TypeError(err)
 
     @property    
     def value(self):
@@ -187,9 +193,14 @@ class DBSchema:
         for module in iter_submodules(root_module):
             for objname in dir(module):
                 obj = getattr(module, objname)
-                if not isinstance(obj, DObjectMetaClass):
+
+                if not isinstance(obj, type):
                     continue
-                if dtable not in obj.__bases__ and dsequence not in obj.__bases__:
+
+                if not issubclass(obj, (dtable, dsequence)) :  
+                    continue
+
+                if obj is dtable or obj is dsequence:
                     continue
 
                 self.schema_objs.append(obj)
@@ -197,10 +208,10 @@ class DBSchema:
     def create(self):
         stmts = ['\n']
         for db_cls in self.schema_objs:
-            if dtable in db_cls.__bases__:
+            if issubclass(db_cls, dtable):
                 for stmt in repr_create_table(db_cls):
                     stmts.append(stmt)
-            elif dsequence in db_cls.__bases__:
+            elif issubclass(db_cls, dsequence):
                 for stmt in repr_create_sequence(db_cls):
                     stmts.append(stmt)
         
@@ -210,10 +221,10 @@ class DBSchema:
     def drop(self):
         stmts = ['\n']
         for db_cls in self.schema_objs:
-            if dtable in db_cls.__bases__:
+            if issubclass(db_cls, dtable):
                 for stmt in repr_drop_table(db_cls):
                     stmts.append(stmt)
-            elif dsequence in db_cls.__bases__:
+            elif issubclass(db_cls, dsequence):
                 for stmt in repr_drop_sequence(db_cls):
                     stmts.append(stmt)
 
@@ -340,6 +351,9 @@ def pq_dtable_merge(current, past):
     if dins.values:
         cols = dins.pkeys + dins.fields
         values = [k + v for k, v in zip(dins.pkvals, dins.values)]
+
+        # If there are new sequence objects, 
+        # get next values of them in a batch
         if seq_attrs:
             seq_cols = [] # (col_idx, col_name, [seq_value])
             for i, colname in enumerate(cols):
@@ -349,12 +363,15 @@ def pq_dtable_merge(current, past):
             for record in values:
                 for seq_col in seq_cols:
                     seq_val = record[seq_col[0]]
-                    if not seq_val:
+                    if seq_val is not None:
                         seq_col[2].append(seq_val)
 
             for colidx, colname, seqvals in seq_cols:
-                seqname = seq_attrs[colname].datatype.__name__
+                if not seqvals:
+                    continue
 
+                # nextval of sequence
+                seqname = seq_attrs[colname].datatype.__name__
                 newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
 
                 for seq, value in zip(seqvals, newvals):
@@ -370,6 +387,32 @@ def pq_dtable_merge(current, past):
         dbc << values
 
     if dchg.values:
+
+        if seq_attrs:
+            # for attrname in dchg.values.items():
+
+            seq_cols = {}
+            for record in dchg.values:
+                for colname in record:
+                    if colname in seq_attrs:
+                        try:
+                            seqvals = seq_cols[colname]
+                        except KeyError: 
+                            seq_cols[colname] = seqvals = []
+
+                        seqvals.append(record[colname][0])
+
+            for colname, seqvals in seq_cols.items():
+                if not seqvals:
+                    continue
+
+                # nextval of sequence
+                seqname = seq_attrs[colname].datatype.__name__
+                newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
+
+                for seq, value in zip(seqvals, newvals):
+                    seq.value = value
+
         # generate update statment in a modified field group
         groups = {}
         for i, modified in enumerate(dchg.values): # group with attr name
@@ -405,6 +448,6 @@ def pq_dtable_merge(current, past):
         
         dbc << [k for k in ddel.pkvals]
 
-def dtable_merge(current, past):
+def dmerge(current, past=None):
     if dbc.dbtype == 'postgres':
         pq_dtable_merge(current, past)

@@ -10,14 +10,13 @@ import datetime as dt
 import sys
 
 
-from domainics.dtable import DBSchema, dtable_merge
+from domainics.dtable import DBSchema, dmerge
 from domainics.domobj import dobject, dset, identity, datt
 from domainics import set_dsn, transaction, dbc
 from domainics.dtable import dtable, tcol, dsequence
 from domainics.db import dbc
 
 set_dsn(sys='postgres', database="demo", host='localhost', user='postgres')
-
 
 class mm_po_item(dtable):
     po_no   = tcol(str) 
@@ -36,11 +35,16 @@ class seq_po(dsequence):
     start = 10000
     step  = 1
 
+class vendor_seq(dsequence):
+    start = 10000
+    step  = 1
+
+
 class mm_po(dtable):
     po_sn         = tcol(seq_po, null_ok=False)
     po_no         = tcol(str,  doc='purchase order number')
     po_date       = tcol(date, doc='P.O. date')
-    vender_sn     = tcol(int,  doc='internal sn of vender')
+    vendor_sn     = tcol(vendor_seq,  doc='internal sn of vender')
     notes         = tcol(str,  doc='addtional notes')
 
     identity(po_sn)
@@ -66,11 +70,13 @@ def test2():
     s1.append(mm_po(po_no='P202'))
     s1.append(mm_po(po_no='P203'))
 
-    print(s1)
-    
-    dtable_merge(s1, None)
-    
-    print(s1)
+    dmerge(s1)
+
+    s2 = s1.copy()
+    s2[0].vendor_sn = vendor_seq()
+    s2[1].vendor_sn = vendor_seq()
+    dmerge(s2, s1)    
+    print(s2)
 
 
 @transaction
@@ -102,7 +108,7 @@ def test():
     s1.append(mm_po(po_no='P004', po_date=dt.date(2015,7,4), notes='hij'))
     s1.append(mm_po(po_no='P003', po_date=dt.date(2015,7,3), notes='efg'))
 
-    dtable_merge(s1, None)
+    dmerge(s1, None)
 
     s2 = s1.copy()
     s2[0].notes = 'abc21'
@@ -110,11 +116,11 @@ def test():
     s2[2].po_date = dt.date(2015, 6, 2)
     s2[2].notes   = 'abc22'
 
-    dtable_merge(s2, s1)
+    dmerge(s2, s1)
 
     s3 = s2.copy()
     del s3[1]
-    dtable_merge(s3, s2)    
+    dmerge(s3, s2)    
 
     po_no = 'P001'
 
@@ -124,7 +130,7 @@ def test():
     po_new = po_old.copy()
     po_new[0].notes = 'test2-123'
 
-    dtable_merge(po_new, po_old)    
+    dmerge(po_new, po_old)    
     print(po_new)
 
 

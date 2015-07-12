@@ -203,12 +203,12 @@ class BaseSQLBlock:
         finally:
             self._cur_record_type = None
 
-    # def cast(self, type):
-    #     if type is 
-    #     pass
-
     @property 
     def rowcount(self):
+        """
+        This read-only attribute specifies the number of rows that the last 
+        query or the number of affected rows by DML statements.
+        """
         self._cursor.rowcount
 
     @property

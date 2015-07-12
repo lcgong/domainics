@@ -12,8 +12,8 @@ from .dtable import dsequence
 
 
 import psycopg2.extensions as _pgext 
-_pgext.register_type(_pgext.UNICODE)
-_pgext.register_type(_pgext.UNICODEARRAY)
+# _pgext.register_type(_pgext.UNICODE)
+# _pgext.register_type(_pgext.UNICODEARRAY)
 
 # register postgresql type dsequence
 _pgext.register_adapter(dsequence, lambda seq : _pgext.AsIs(repr(seq.value)))

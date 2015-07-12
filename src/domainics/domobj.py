@@ -170,8 +170,7 @@ class datt:
             errmsg = "The identity attribute '%s' is read-only" % self.name
             raise TypeError(errmsg)
 
-        value = cast_attr_value(name, value, self.datatype)
-  
+        value = cast_attr_value(name, value, self.datatype)  
 
         attrs  = getattr(instance, '_dobject__attrs')
         now_val = attrs.get(name, None)
@@ -221,7 +220,9 @@ class AggregateAttr:
 
         if not isinstance(value, self.agg_type):
             errmsg = "The aggregate object %s should be %s type, instead of %s"
-            errmsg %= (self.name, self.agg_type.__name__, value.__class__.__name__)
+            errmsg %= (self.name, 
+                       self.agg_type.__name__, 
+                       value.__class__.__name__)
             raise TypeError(errmsg)
         
         
@@ -270,7 +271,8 @@ class dset(daggregate):
         obj_id = obj._dobj_id
         if not obj_id:
             errmsg = "The identity(%s) of %s is required" 
-            errmsg %= (','.join(self.__class__._dobj_id_names, self.__class__.__name__))
+            errmsg %= (','.join(self.__class__._dobj_id_names, 
+                       self.__class__.__name__))
             raise TypeError(errmsg)
         
         if obj_id in self.__map:
@@ -280,14 +282,6 @@ class dset(daggregate):
             index = len(self.__list)
             self.__map[obj_id] = index
             self.__list.append(obj)
-
-
-    # def remove(self, obj):
-    #     index = self.__map.get(obj._dobj_id)
-    #     if index is None:
-    #         raise ValueError("%r not in dset" % obj)
-
-    #     del self.__list[index]
 
     def clear(self):
         """clear all objects in aggregate"""
@@ -462,10 +456,10 @@ def cast_attr_value(attrname, val, datatype):
 
     try:
         return datatype(val)
-    except ValueError as ex:
-        err = "The attribute '%s' should be \'%s\' type: value=%r(%s)"
-        err %= (attrname, datatype, val, type(val).__name__)
-        raise TypeError(err)            
+    except (ValueError, TypeError) as ex:
+        err = "The attribute '%s' should be \'%s\' type, not '%s'"
+        err %= (attrname, datatype.__name__, type(val).__name__)
+        raise TypeError(err).with_traceback(ex.__traceback__)           
 
 
 class dobject(metaclass=DObjectMetaClass):
@@ -477,8 +471,9 @@ class dobject(metaclass=DObjectMetaClass):
 
         instance = super(dobject, cls).__new__(cls)
         attr_values = OrderedDict()
-        setattr(instance, '_dobject__attrs', attr_values)
-        setattr(instance, '_dobject__orig',  {}) # original values
+        instance_setattr = super(dobject, instance).__setattr__
+        instance_setattr('_dobject__attrs', attr_values)
+        instance_setattr('_dobject__orig',  {}) # original values
 
         if not values and not kwvalues:
             return instance
@@ -486,16 +481,6 @@ class dobject(metaclass=DObjectMetaClass):
         fields = []
         for n, f in cls._dobj_attrs.items():
             fields.append((n, f))  
-
-        # seen = set()
-        # fields = []
-        # for c in cls.__mro__:
-        #     if c == dobject: 
-        #         break
-
-        #     for n, f in c._dobj_fields.items():
-        #         seen.add(n)
-        #         fields.append((n, f))
 
         for val in values:
             name, field = fields.pop(0)
@@ -518,7 +503,6 @@ class dobject(metaclass=DObjectMetaClass):
                              dt.datetime, dt.timedelta)):
                         val = attr.default
 
-
             attr_values[name] = val
 
         if kwvalues:
@@ -535,7 +519,13 @@ class dobject(metaclass=DObjectMetaClass):
         errmsg %= (self.__class__.__name__, name)
         raise AttributeError(errmsg)
 
-
+    def __setattr__(self, name, value):
+        if hasattr(self, name):
+            super(dobject, self).__setattr__(name, value)
+        else:
+            errmsg ='The domain object %s has no field: %s ' 
+            errmsg %= (self.__class__.__name__, name)
+            raise AttributeError(errmsg)
 
     def __repr__(self):
         """ """
@@ -558,12 +548,8 @@ class dobject(metaclass=DObjectMetaClass):
         if this_id is not None and this_id == other._dobj_id:
             return True
 
-        # print(self, other)
-
         if set(self.__attrs.keys()) != set(other.__attrs.keys()):
             return False
-
-
 
         for name, val in self.__attrs.items():
             if val != other.__attrs[name]:
@@ -603,26 +589,5 @@ class dobject(metaclass=DObjectMetaClass):
             self.__attrs[attr_name] = tgt_val
 
         return self
-
-
-    # @classmethod
-    # def __mro_fields__(cls):
-        
-    #     seen = set()
-    #     for field in cls.__fields__:
-    #         seen.add(field)
-    #         yield field
-
-    #     for c in cls.__mro__:
-    #         if cls == dobject:
-    #             break
-
-    #         for field in c.__fields__:
-    #             if field in seen:
-    #                 continue
-
-    #             seen.add(field)
-    #             yield field
-
 
 
