@@ -444,23 +444,6 @@ class dset(daggregate):
         return self
         # operator 'o.x += a', translate into o.x = o.x.__iadd__(a)
 
-
-
-def cast_attr_value(attrname, val, datatype):
-    if val is None:
-        return val
-
-    if isinstance(val, datatype):
-        return val
-
-    try:
-        return datatype(val)
-    except (ValueError, TypeError) as ex:
-        err = "The attribute '%s' should be \'%s\' type, not '%s'"
-        err %= (attrname, datatype.__name__, type(val).__name__)
-        raise TypeError(err).with_traceback(ex.__traceback__)           
-
-
 class dobject(metaclass=DObjectMetaClass):
 
     def __new__(cls, *values, **kwvalues):
@@ -557,11 +540,12 @@ class dobject(metaclass=DObjectMetaClass):
         return True
 
     def copy(self):
+        self_attrs = getattr(self,   '_dobject_attrs')
         kwargs = OrderedDict()
-        for attr_name in self.__attrs:
-            value = self.__attrs[attr_name]
+        for attr_name in self_attrs:
+            value = self_attrs[attr_name]
 
-            if isinstance(value, daggregate) or isinstance(value, dobject) :
+            if isinstance(value, daggregate) or isinstance(value, dobject):
                 value = value.copy()
             else: # some copy
                 pass
@@ -571,22 +555,40 @@ class dobject(metaclass=DObjectMetaClass):
         return self.__class__(**kwargs)
 
     def __ilshift__(self, target):
+        """ x <<= y """
+
+        self_attrs = getattr(self,   '_dobject_attrs')
+        targ_attrs = getattr(target, '_dobject_attrs')
         
-        for attr_name in self.__attrs:
-            if attr_name not in target.__attrs:
+        for attr_name in self_attrs:
+            if attr_name not in targ_attrs:
                 continue
 
-            ths_val = self.__attrs[attr_name]
-            tgt_val = target.__attrs[attr_name]
-            if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject) :
+            ths_val = self_attrs[attr_name]
+            tgt_val = targ_attrs[attr_name]
+            if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
                 ths_val.__ilshift__(tgt_val)
                 continue
 
-            if self.__attrs[attr_name] == tgt_val:
+            if ths_val == tgt_val:
                 continue
 
-            self.__attrs[attr_name] = tgt_val
+            self_attrs[attr_name] = tgt_val
 
         return self
+
+def cast_attr_value(attrname, val, datatype):
+    if val is None:
+        return val
+
+    if isinstance(val, datatype):
+        return val
+
+    try:
+        return datatype(val)
+    except (ValueError, TypeError) as ex:
+        err = "The attribute '%s' should be \'%s\' type, not '%s'"
+        err %= (attrname, datatype.__name__, type(val).__name__)
+        raise TypeError(err).with_traceback(ex.__traceback__)           
 
 
