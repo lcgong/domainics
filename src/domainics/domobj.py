@@ -161,8 +161,8 @@ class datt:
         if instance is None: # get domain field
             return self
 
-        val = getattr(instance, '_dobject__attrs').get(self.name, None)
-        return val
+        attrs = getattr(instance, '_dobject__attrs')
+        return attrs.get(self.name)
 
     def __set__(self, instance, value):
         name = self.name
@@ -170,21 +170,20 @@ class datt:
             errmsg = "The identity attribute '%s' is read-only" % self.name
             raise TypeError(errmsg)
 
-        value = cast_attr_value(name, value, self.datatype)  
-
         attrs  = getattr(instance, '_dobject__attrs')
         now_val = attrs.get(name, None)
+        value   = cast_attr_value(name, value, self.datatype)  
 
         if now_val != value :
             attrs[name] = value
 
-            changed = getattr(instance, '_dobject__orig')
-            old_val = changed.get(name, None)
-            if old_val == value : # the value is recoveried
-                del changed[name]
-            else:
-                if name not in changed:
-                    changed[name] = now_val
+            # changed = getattr(instance, '_dobject__orig')
+            # old_val = changed.get(name, None)
+            # if old_val == value : # the value is recoveried
+            #     del changed[name]
+            # else:
+            #     if name not in changed:
+            #         changed[name] = now_val
 
     def __delete__(self, instance):
         raise NotImplemented('unsupported field deleting')
@@ -530,9 +529,9 @@ class dobject(metaclass=DObjectMetaClass):
     def __repr__(self):
         """ """
         segs = ['%s=%r' % (a, self.__attrs.get(a)) for a in self.__attrs]
-        if self.__orig:
-            args = ', '.join(['%s=%r' % p for p in self.__orig.items() ])
-            segs.append('__orig=(' + args + ')')
+        # if self.__orig:
+            # args = ', '.join(['%s=%r' % p for p in self.__orig.items() ])
+            # segs.append('__orig=(' + args + ')')
 
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
