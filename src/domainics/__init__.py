@@ -3,11 +3,12 @@
 
 
 from .db import dbc, transaction, set_dsn
-from .web import handler, route, route_base, WebApp
 
+from .tornice.route import route_base, http_route, rest_route
+from .tornice.route import _request_handler_pillar
+from .tornice.app   import WebApp
 
-request = route
-rest = route
+handler = _request_handler_pillar
 
 
 

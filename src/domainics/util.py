@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import re
 import sys as _sys
 from keyword import iskeyword as _iskeyword
 from collections import OrderedDict as _OrderedDict
@@ -30,6 +31,27 @@ def iter_submodules(root_module, recursive=True):
         if ispkg and not isinstance(module.__path__, list):
             continue
         yield module
+
+_ptn_comma_split = re.compile(r'(\\*)(,\s*)')
+def comma_split(s):
+    """split a string with comma """
+    offset, prefix = 0, ''
+    for m in _ptn_comma_split.finditer(s):
+        prefix += s[offset:m.start()]
+        g = m.groups()
+        len_seg = len(g[0])
+        if len_seg % 2:
+            prefix += m.group(0)
+            offset = m.end()
+            continue
+        else:
+            prefix += m.group(1)
+
+        yield prefix
+
+        offset, prefix = m.end(), ''
+
+    yield s[offset:]
 
 
 _nameddict_class_tmpl = """
