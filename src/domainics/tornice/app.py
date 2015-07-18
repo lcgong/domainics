@@ -122,6 +122,11 @@ class WebApp:
 
 
 
+    def main(self):
+        self.setup()
+        import domainics.ioloop
+        domainics.ioloop.run() # 服务主调度
+
 
 class StaticFileHandler(tornado.web.StaticFileHandler):
     '''read static files from folder.
@@ -200,20 +205,20 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
 
 
 
-def _enumerate_submodules(pkg_or_module, submodules=True):
-    if isinstance(pkg_or_module, str):
-        pkg_or_module = importlib.import_module(pkg_or_module)
-        if hasattr(pkg_or_module, '_module_route_table'):
-            yield pkg_or_module
+# def _enumerate_submodules(pkg_or_module, submodules=True):
+#     if isinstance(pkg_or_module, str):
+#         pkg_or_module = importlib.import_module(pkg_or_module)
+#         if hasattr(pkg_or_module, '_module_route_table'):
+#             yield pkg_or_module
 
-    if not submodules:
-        return
+#     if not submodules:
+#         return
 
-    if hasattr(pkg_or_module, '__path__'):
-        module_prefix = pkg_or_module.__name__ + '.'
-        for loader, module_name, ispkg in pkgutil.walk_packages(pkg_or_module.__path__, module_prefix):
-            if ispkg: continue
+#     if hasattr(pkg_or_module, '__path__'):
+#         module_prefix = pkg_or_module.__name__ + '.'
+#         for loader, module_name, ispkg in pkgutil.walk_packages(pkg_or_module.__path__, module_prefix):
+#             if ispkg: continue
 
-            module = loader.find_module(module_name).load_module(module_name)
-            if hasattr(module, '_module_route_table'):
-                yield module
+#             module = loader.find_module(module_name).load_module(module_name)
+#             if hasattr(module, '_module_route_table'):
+#                 yield module

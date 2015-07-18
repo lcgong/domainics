@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 
+import logging
+_logger = logging.getLogger(__name__)
+
 import re
 import inspect
 import types
+import datetime
 import json
 from collections import namedtuple, OrderedDict
-from tornado.web import RequestHandler
-
+from tornado.web import RequestHandler, HTTPError
+from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
-from ..util   import comma_split
-from ..domobj import dset
+from ..util   import comma_split, filter_traceback
+from ..domobj import dset, dobject
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
 
@@ -210,56 +214,130 @@ def _parse_route_rule(rule):
             if not argname:
                 nonames.append(seg)
 
-            pattern += '(?P<%s>%s)' % (argname, mask)
+            if argname is None:
+                pattern += '(%s)' % mask
+            else:
+                pattern += '(?P<%s>%s)' % (argname, mask)
             factories.append((argname, out_filter))
         elif argname:
             pattern += re.escape(argname)
 
-    if nonames:
-        errmsg = "These arguments should be named regex: "
-        errmsg += ', '.join([
-            '[%d:%d](%s)' % (seg[0], seg[1], rule[seg[0]:seg[1]]) 
-            for seg in nonames])
-        raise ValueError(errmsg)
+    # if nonames:
+    #     errmsg = "These arguments should be named regex: "
+    #     errmsg += ', '.join([
+    #         '[%d:%d](%s)' % (seg[0], seg[1], rule[seg[0]:seg[1]]) 
+    #         for seg in nonames])
+    #     raise ValueError(errmsg)
 
     return pattern, dict(factories)
-
-
 
 
 def _http_delegate(handler, func, *args, **kwargs):
     return func(*args, **kwargs)
 
-def _json_rest_delegate(handler, func, *args, **kwargs):
+def _http_delegate_error(handler, status_code, **kwargs):
+    exc_type, exc_val, exc_tb = kwargs['exc_info']
 
-    print(kwargs)
-    if 'data' in kwargs:
-        print(333, handler.request.body)
-        data = tornado.escape.json_decode(handler.request.body)
-        kwargs['data'] = data
+    if isinstance(exc_val, HTTPError):
+        status_code = exc_val.status_code
+        reason = exc_val.reason if hasattr(exc_val, 'reason') else None
+        message = exc_val.log_message
+    else:
+        status_code = 500
+        reason='Server Exception'
+        message = str(exc_val)
+    
+    tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
+    path = handler.request.path
+    errmsg = [
+        '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
+        'This request (%s) was handled by %s' % (path, handler.handler_name)
+    ]
+    _logger.error('. '.join(errmsg), exc_info=True)
+
+    for tb in tb_list:
+        errmsg.append('    at %s, code: %s' % (tb['at'], tb['code']))
+    errmsg = '\n'.join(errmsg)
+
+    handler.set_status(status_code, reason=reason)
+    handler.set_header('Content-Type', 'text/plain;charset=UTF-8')
+    handler.write(errmsg)
 
     
+
+
+def _json_rest_delegate(handler, func, *args, **kwargs):
+
+    if 'jsonbody' in kwargs:
+        body_data = handler.request.body
+        if body_data : # if no body data, here is empty byte data
+            kwargs['jsonbody'] = json.loads(body_data.decode('UTF-8'))
+        else:
+            kwargs['jsonbody'] = None
+
     obj = func(*args, **kwargs)
     if not isinstance(obj, (list, tuple, dset)):
         obj = [obj]
 
     handler.set_header('Content-Type', 'application/json')
-    handler.write(json.dumps(obj, cls=_RESTJSONEncoder))
+    handler.write(json.dumps(obj, cls=_JSONEncoder))
 
 
-class _RESTJSONEncoder(json.JSONEncoder):
+def _json_rest_delegate_error(handler, status_code, **kwargs):
+            
+    exc_type, exc_val, exc_tb = kwargs['exc_info']
+
+    if isinstance(exc_val, HTTPError):
+        status_code = exc_val.status_code
+        reason = exc_val.reason if hasattr(exc_val, 'reason') else None
+        message = exc_val.log_message
+    else:
+        status_code = 500
+        reason='Server Exception'
+        message = str(exc_val)
+    
+    tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
+
+    path = handler.request.path
+    errmsg = [
+        '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
+        'This request (%s) was handled by %s' % (path, handler.handler_name)
+    ]
+    _logger.error('. '.join(errmsg), exc_info=True)
+
+    errobj = OrderedDict([
+            ('status_code', status_code),
+            ('error', message),
+            ('type', exc_type.__name__),
+            ('path', path),
+            ('handler', handler.handler_name),
+            ('traceback', tb_list)
+        ])
+
+    handler.set_status(status_code, reason=reason)
+    handler.set_header('Content-Type', 'application/json')
+    handler.write(json.dumps([errobj], cls=_JSONEncoder))
+
+class _JSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
-        elif isinstance(obj, (decimal.Decimal)) :
+        elif isinstance(obj, (Decimal)) :
             return float(obj)
+        elif isinstance(obj, (dset, dobject)):
+            return obj.export()
         else:
-            return json.JSONEncoder.default(self, obj)
+            return super(_JSONEncoder, self).default(obj)
 
 
 proto_delegates = {
     'HTTP' : _http_delegate,
     'REST' : _json_rest_delegate
+}
+
+proto_error_delegates = {
+    'HTTP' : _http_delegate_error,
+    'REST' : _json_rest_delegate_error
 }    
 
 def _wrap_handler(func, proto, pargs, qargs):
@@ -272,14 +350,14 @@ def _wrap_handler(func, proto, pargs, qargs):
 
     def handler_func(self, *args, **kwargs):
         for arg in kwargs:
-            if arg in pargs and not pargs[arg] != str:
+            if arg in pargs and pargs[arg] != str:
                 kwargs[arg] = pargs[arg](kwargs[arg])
             elif arg in qargs:                
                 kwargs[arg] = self.get_argument(n, None)
 
         for param in nodefault_params: # the param is not assigned
             if param not in kwargs:
-                kwargs[param] = None       
+                kwargs[param] = None
 
         self._handler_args = kwargs
         
@@ -321,12 +399,16 @@ def _make_handler_class(handler_func, proto, methods, pargs, qargs):
     typename = handler_func.__name__ + '_handler'
     hndlname = handler_func.__module__ + '.' + handler_func.__name__
 
+    delegate_func = _wrap_handler(handler_func, proto, pargs, qargs)
+    delegate_err  = proto_error_delegates.get(proto)
     attrs = OrderedDict()
     for m in methods:
-        attrs[m.lower()]  = _wrap_handler(handler_func, proto, pargs, qargs)
+        attrs[m.lower()]  = delegate_func
     attrs['__str__']      = _str_handler_object
     attrs['handler_name'] = hndlname
-    print(attrs)
+    if delegate_err:
+        attrs['write_error'] = delegate_err
+    
     newcls = type(typename, (RequestHandler,), attrs)
 
 

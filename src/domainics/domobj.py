@@ -33,17 +33,17 @@ from collections import namedtuple
 import datetime as dt
 from decimal import Decimal
 
-def identity(*fields):
+def dident(*fields):
     """ """
 
     # the primary_key is called class block,
     # pass fields to metaclass '__new__'  via _dobj_pks_pendings
     frame = sys._getframe(1)
-    if not hasattr(identity, '_dobj_pks_pendings'):
+    if not hasattr(dident, '_dobj_pks_pendings'):
         pendings = {}
-        setattr(identity, '_dobj_pks_pendings', pendings)
+        setattr(dident, '_dobj_pks_pendings', pendings)
     else:
-        pendings = getattr(identity, '_dobj_pks_pendings')
+        pendings = getattr(dident, '_dobj_pks_pendings')
 
     pks = []
     for field in fields:
@@ -67,8 +67,8 @@ class DObjectMetaClass(type):
     def __new__(metacls, classname, bases, class_dict):
 
 
-        if hasattr(identity, '_dobj_pks_pendings'):
-            pk_pendings = getattr(identity, '_dobj_pks_pendings')
+        if hasattr(dident, '_dobj_pks_pendings'):
+            pk_pendings = getattr(dident, '_dobj_pks_pendings')
             qclsname = class_dict.get('__module__') + '.' + class_dict.get('__qualname__')
             if qclsname in pk_pendings:
                 pkeys = pk_pendings.pop(qclsname)
@@ -147,7 +147,7 @@ class DObjectMetaClass(type):
 class datt:
     """ """
 
-    __slots__ = ('name', 'datatype', 'default_expr', 'doc', 'is_identity')
+    __slots__ = ('name', 'datatype', 'default_expr', 'default', 'doc', 'is_identity')
 
     def __init__(self, type=object, expr=None, default=None, doc=None):
         self.datatype     = type
@@ -312,6 +312,11 @@ class dset(daggregate):
 
         items = (item.copy() for item in self.__list)
         return dset(self.item_type, items)
+
+    def export(self):
+        """export dset object in list"""
+
+        return [item.export() for item in self.__list]
 
     def __ilshift__(self, target):
         """ x <<= y, the domain object x conforms to y """        
@@ -540,7 +545,7 @@ class dobject(metaclass=DObjectMetaClass):
         return True
 
     def copy(self):
-        self_attrs = getattr(self,   '_dobject_attrs')
+        self_attrs = getattr(self,   '_dobject__attrs')
         kwargs = OrderedDict()
         for attr_name in self_attrs:
             value = self_attrs[attr_name]
@@ -553,6 +558,23 @@ class dobject(metaclass=DObjectMetaClass):
             kwargs[attr_name] = value
 
         return self.__class__(**kwargs)
+
+    def export(self):
+        """export dobject as list or dict """
+
+        self_attrs = getattr(self,   '_dobject__attrs')
+        kwargs = OrderedDict()
+        for attr_name in self_attrs:
+            value = self_attrs[attr_name]
+
+            if isinstance(value, daggregate) or isinstance(value, dobject):
+                value = value.export()
+            else: # some copy
+                pass
+
+            kwargs[attr_name] = value
+
+        return kwargs
 
     def __ilshift__(self, target):
         """ x <<= y """
@@ -576,6 +598,8 @@ class dobject(metaclass=DObjectMetaClass):
             self_attrs[attr_name] = tgt_val
 
         return self
+
+
 
 def cast_attr_value(attrname, val, datatype):
     if val is None:

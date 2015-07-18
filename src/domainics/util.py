@@ -5,7 +5,8 @@ import sys as _sys
 from keyword import iskeyword as _iskeyword
 from collections import OrderedDict as _OrderedDict
 from pkgutil import walk_packages
-
+import inspect
+import linecache
 
 def iter_submodules(root_module, recursive=True):
     """  """
@@ -54,6 +55,31 @@ def comma_split(s):
     yield s[offset:]
 
 
+
+def filter_traceback(tb, excludes=None):
+    tb_list = []
+    while tb is not None:
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        co = f.f_code
+
+        name = co.co_name
+        modname = inspect.getmodule(co).__name__
+        if excludes is not None:
+            if any(modname.startswith(prefix) for prefix in excludes):
+                tb = tb.tb_next
+                continue
+
+        filename = co.co_filename
+        linecache.checkcache(filename)
+        line = linecache.getline(filename, lineno, f.f_globals)
+
+        err_at  = 'module %s, line %d in %s' % (modname, lineno, name)
+        tb_list.append({'at' : err_at, 'code' : line.strip()})
+
+        tb = tb.tb_next
+    return tb_list
+    
 _nameddict_class_tmpl = """
 class {typename}:
     __fields__ = {field_names!r}

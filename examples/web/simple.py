@@ -10,22 +10,49 @@ from domainics import WebApp, route_base, http_route, rest_route, handler
 
 route_base('/abc', method='GET')
 
+from decimal import Decimal
+from domainics import dobject, dset, datt, dident
 
-@rest_route('/{sid:int}', method='GET, POST', qargs='page,sort')
-def hi(sid, page, data=None):
-    # print('123')
-    # handler.write("Hello, world, sid=%s, page=%s\n" % (sid, page))  
-    # handler.write("data: %r" % get_list())
-    print(55, data)
+class BillItem(dobject):
+	item_no = datt(str)
+	name    = datt(str)
+	qty     = datt(Decimal)
 
-    return {1:3}
+	dident(item_no)
+
+class Bill(dobject):
+	bill_no = datt(str)
+	items   = dset(BillItem)
+	notes   = datt(str)
+
+	dident(bill_no)
+
+@rest_route('/rest/{sid:int}', method='GET, POST', qargs='page,sort')
+def hi(sid, page, jsonbody):
+
+    print(55, jsonbody, handler.request.body)
+
+    bill = Bill(bill_no='PO#001-%05d' % sid , notes='something...', 
+    	items=[
+		    BillItem(item_no='001', name='item-a', qty=100),
+		    BillItem(item_no='002', name='item-b', qty=100),
+		    BillItem(item_no='003', name='item-c', qty=100),
+    ])
+
+    raise ValueError('2334')
+
+
+    return bill
+
+
+@http_route('/http/{sid:int}', method='GET, POST', qargs='page,sort')
+def hi(sid, page, jsonbody):
+	handler.write('hi %d, at page %s' % (sid, page))
+	1/0
 
 
 if __name__ == '__main__':
     app = WebApp(port=8888)
     # app.add_handler_module('__main__')
-    app.add_static_handler('/{path:path}', folder='static', default='/index.html')
-    app.setup()
-
-    import domainics.ioloop
-    domainics.ioloop.run() # 服务主调度
+    app.add_static_handler('/{:path}', folder='static', default='/index.html')
+    app.main()
