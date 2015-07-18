@@ -14,6 +14,7 @@ from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject
+from ..error  import AuthenticationError
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
 
@@ -382,6 +383,49 @@ def _str_handler_object(self):
         segs.append('%s=%r' % (arg, kwargs.get(arg, None)))
     return hndlname + '(' + ', '.join(func_args) + ') at ' + hex(id(self)) 
 
+
+class PrincipalProperty:
+    """The principal of the authenticated session. 
+    If it is unauthenticated, AuthenticationError is raised.
+
+    If principal be set None or principal deleted, 
+    it  will clear this authenticated session. 
+    """
+
+    _cookie_name = '_tornice_principal'
+
+    def __get__(self, handler, owner):
+        if handler._tornice_principal is not None:
+            return handler._tornice_principal
+
+
+        value = handler.get_secure_cookie(self._cookie_name)
+        if value is not None:
+            handler._tornice_principal = value
+            return value.decode('utf-8')
+
+        raise AuthenticationError('This session is unauthenticated')
+
+
+    def __set__(self, handler, value):
+        if value is not None and not isinstance(value, str):
+            errmsg ='principal value should be str type, not ' 
+            errmsg += '' 
+            raise ValueError(errmsg)
+        
+        if value is None :
+            handler.clear_cookie(self._cookie_name)
+            handler._tornice_principal = None
+            return 
+        
+        # session-only cookie, expires_days=None
+        handler.set_secure_cookie(self._cookie_name, value, 
+                                  expires_days=None, path='/', domain=None)  
+        handler._tornice_principal = value    
+
+
+
+
 def _make_handler_class(handler_func, proto, methods, pargs, qargs):
 
     func_sig    = inspect.signature(handler_func).parameters
@@ -404,8 +448,10 @@ def _make_handler_class(handler_func, proto, methods, pargs, qargs):
     attrs = OrderedDict()
     for m in methods:
         attrs[m.lower()]  = delegate_func
+    attrs['_tornice_principal'] = None
     attrs['__str__']      = _str_handler_object
     attrs['handler_name'] = hndlname
+    attrs['principal']    = PrincipalProperty()
     if delegate_err:
         attrs['write_error'] = delegate_err
     

@@ -48,11 +48,19 @@ def hi(sid, page, jsonbody):
 @http_route('/http/{sid:int}', method='GET, POST', qargs='page,sort')
 def hi(sid, page, jsonbody):
 	handler.write('hi %d, at page %s' % (sid, page))
-	1/0
+	
+	handler.principal = '123'
+	print(handler.principal)
+	assert handler.principal == '123'
+	handler.principal = None
+	assert handler.principal
+
 
 
 if __name__ == '__main__':
     app = WebApp(port=8888)
     # app.add_handler_module('__main__')
     app.add_static_handler('/{:path}', folder='static', default='/index.html')
+    app.settings['cookie_secret'] = '__cookie_secret__'
     app.main()
+
