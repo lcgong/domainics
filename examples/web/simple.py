@@ -2,10 +2,6 @@
 # -*- coding: utf-8 -*-
 
 
-# import os
-# import sys
-
-
 from domainics import WebApp, route_base, http_route, rest_route, handler
 
 route_base('/abc', method='GET')
@@ -55,12 +51,11 @@ def hi(sid, page, jsonbody):
 	handler.principal = None
 	assert handler.principal
 
-
+ 
 
 if __name__ == '__main__':
-    app = WebApp(port=8888)
+    app = WebApp(port=8888, debug=True)
     # app.add_handler_module('__main__')
-    app.add_static_handler('/{:path}', folder='static', default='/index.html')
-    app.settings['cookie_secret'] = '__cookie_secret__'
+    # app.add_static_handler('/{:path}', folder='static', default='/index.html')
     app.main()
 
