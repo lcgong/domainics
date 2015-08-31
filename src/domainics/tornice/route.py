@@ -7,7 +7,6 @@ import re
 import inspect
 import types
 import datetime
-import json
 from collections import namedtuple, OrderedDict
 from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
@@ -15,6 +14,8 @@ from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject
 from ..error  import AuthenticationError
+from .. import json
+
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
 
@@ -318,17 +319,6 @@ def _json_rest_delegate_error(handler, status_code, **kwargs):
     handler.set_status(status_code, reason=reason)
     handler.set_header('Content-Type', 'application/json')
     handler.write(json.dumps([errobj], cls=_JSONEncoder))
-
-class _JSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.datetime)):
-            return obj.isoformat()
-        elif isinstance(obj, (Decimal)) :
-            return float(obj)
-        elif isinstance(obj, (dset, dobject)):
-            return obj.export()
-        else:
-            return super(_JSONEncoder, self).default(obj)
 
 
 proto_delegates = {

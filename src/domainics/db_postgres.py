@@ -18,6 +18,9 @@ import psycopg2.extensions as _pgext
 # register postgresql type dsequence
 _pgext.register_adapter(dsequence, lambda seq : _pgext.AsIs(repr(seq.value)))
 
+class jsonb:
+    pass
+
 
 class PostgreSQLBlock(BaseSQLBlock):
     _conn_pools = {}

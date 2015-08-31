@@ -7,6 +7,9 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
 from . import transaction, dbc
+
+from . import json
+
 from .util import iter_submodules
 from .domobj import DObjectMetaClass, dobject, datt, dset
 
@@ -15,15 +18,39 @@ class dtable(dobject):
 
 class tcol(datt):
 
-    def __init__(self, datatype, len=None, null_ok=True, **kwargs):
+    def __init__(self, datatype, len=None, nullable=True, **kwargs):
         self.len = len
 
         if issubclass(datatype, dsequence):
-            if kwargs.get('default') is not None or not null_ok:
+            if kwargs.get('default') is not None or not nullable:
                 kwargs['default'] = datatype
 
         super(tcol, self).__init__(datatype, **kwargs)
 
+
+class DBArray(dset):
+
+    @classmethod
+    def __setter_filter__(cls, value):
+        if issubclass(value.__class__, (list,)):
+            return value
+
+        raise ValueError("the value should be \'list\'")
+
+
+def array(item_type, iterable=None, dimensions=1, doc=None):
+    cls_attrs = dict(dimensions=dimensions, item_type=item_type)
+    cls_name  = '_DBArray_%dD' % dimensions
+
+    return type(cls_name, (DBArray,), cls_attrs)
+
+class json_object(object):
+    @classmethod
+    def __setter_filter__(cls, value):
+        if issubclass(value.__class__, (list, dict)):
+            return value
+
+        raise ValueError("the assigned value type should be one of 'list', 'dict'")
 
 def repr_create_table(dobj_cls):
 
@@ -63,8 +90,10 @@ def repr_create_table(dobj_cls):
             sql %= (table_name, name, quote(attr.doc))
             yield sql       
 
-def repr_datatype(dtype, length):
+def repr_datatype(dtype, length=None):
     datatype = None
+    assert dtype is not None
+
     if dtype == int:
         if not length:
             datatype = 'INTEGER'
@@ -99,10 +128,16 @@ def repr_datatype(dtype, length):
         elif length == 4:
             datatype = 'BIGINT'
 
+    elif issubclass(dtype, json_object):
+        datatype = 'JSONB'
+
+    elif issubclass(dtype, DBArray):
+        datatype = repr_datatype(dtype.item_type) + '[]' * dtype.dimensions
+
     if datatype:
         return datatype
 
-    raise TypeError('unkown type: %s(%r)' % (dtype.__name__, dopts)) 
+    raise TypeError('unkown type: %s' % dtype.__name__) 
 
 
 def repr_create_sequence(dobj_cls):
@@ -309,7 +344,18 @@ def _dtable_diff(current, past=None):
     pkvals, values = [], []
     for obj in inslst:
         pkvals.append(tuple(getattr(obj, f) for f in pkeys))
-        values.append(tuple(getattr(obj, f) for f in fields))
+        
+        item_val = []
+        for fieldname in fields:
+            field = item_type._dobj_attrs[fieldname]
+            field_value = getattr(obj, fieldname)
+
+            if issubclass(field.datatype, json_object):
+                field_value = json.dumps(field_value)
+            
+            item_val.append(field_value)
+
+        values.append(tuple(item_val))
     
     dt_ins = _dtdelta(pkeys, fields, pkvals, values)
 

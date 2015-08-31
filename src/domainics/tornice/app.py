@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*- 
+import logging
+_logger = logging.getLogger(__name__)
 
 import re
 import os.path
@@ -102,7 +104,8 @@ class WebApp:
         """setup web application"""
 
         handlers = []
-        segs = []
+        
+        segs = ['Found request handlers:']
         for rule in self._request_handlers:
             path_ptn, hcls, params = self._request_handlers[rule]
             s = rule + ' {' + path_ptn +'} => ' + hcls.__name__ + '('
@@ -112,7 +115,7 @@ class WebApp:
             segs.append(s)
             handlers.append((path_ptn, hcls, params))
 
-        print('\n'.join(segs))
+        _logger.info('\n'.join(segs))
 
         if 'cookie_secret' not in self.settings:
             self.settings['cookie_secret'] = generate_cookie_secret()

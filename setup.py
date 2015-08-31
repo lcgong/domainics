@@ -7,15 +7,16 @@ from setuptools import find_packages
 
 setup(
     name='domainics',
-    version='0.1',
+    version='0.2.1',
     license="BSD",
-    description='RESTful Framework with domain objects and pillars',
+    description='Web Framwork with Domain-Orieted architecure',
     author='Chenggong Lyu',
     author_email='lcgong@gmail.com',
     url='https://github.com/lcgong/domainics',
     packages=find_packages("src"),
     package_dir = {"": "src"},
     zip_safe = False,
+    install_requires = ["tornado>=4.2"],
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",

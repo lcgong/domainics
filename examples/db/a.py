@@ -11,9 +11,11 @@ import sys
 
 
 from domainics.dtable import DBSchema, dmerge
-from domainics.domobj import dobject, dset, identity, datt
+# from domainics.domobj import dobject, dset, identity, datt
+
+from domainics.domobj import dset
 from domainics import set_dsn, transaction, dbc
-from domainics.dtable import dtable, tcol, dsequence
+from domainics.dtable import dtable, tcol, dsequence, array
 from domainics.db import dbc
 
 set_dsn(sys='postgres', database="demo", host='localhost', user='postgres')
@@ -29,7 +31,8 @@ class mm_po_item(dtable):
     price   = tcol(Decimal, len=(16,2))
     notes   = tcol(str, doc='description of item')
 
-    identity(po_no, line_no)
+    __primary_key__ = [po_no, line_no] # 
+
 
 class seq_po(dsequence):
     start = 10000
@@ -41,13 +44,16 @@ class vendor_seq(dsequence):
 
 
 class mm_po(dtable):
-    po_sn         = tcol(seq_po, null_ok=False)
-    po_no         = tcol(str,  doc='purchase order number')
-    po_date       = tcol(date, doc='P.O. date')
-    vendor_sn     = tcol(vendor_seq,  doc='internal sn of vender')
-    notes         = tcol(str,  doc='addtional notes')
+    po_sn      = tcol(seq_po, nullable=False)
+    po_no      = tcol(str,  doc='purchase order number')
+    po_date    = tcol(date, doc='P.O. date')
+    vendor_sn  = tcol(vendor_seq,  doc='internal sn of vender')
+    notes      = tcol(str,  doc='addtional notes')
 
-    identity(po_sn)
+    tags       = tcol(array(str, dimensions=1), doc='tags')
+
+    __primary_key__ = [po_sn]
+
 
 class mm_vendor(dtable):
     vendor_sn = tcol(int)

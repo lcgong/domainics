@@ -33,30 +33,33 @@ from collections import namedtuple
 import datetime as dt
 from decimal import Decimal
 
-def dident(*fields):
-    """ """
 
-    # the primary_key is called class block,
-    # pass fields to metaclass '__new__'  via _dobj_pks_pendings
-    frame = sys._getframe(1)
-    if not hasattr(dident, '_dobj_pks_pendings'):
-        pendings = {}
-        setattr(dident, '_dobj_pks_pendings', pendings)
-    else:
-        pendings = getattr(dident, '_dobj_pks_pendings')
 
-    pks = []
-    for field in fields:
-        if not isinstance(field, datt):
-            errmsg = 'the primary key \'%s\' is not datt' % field
-            raise TypeError(errmsg)
+# def dident(*fields):
+#     """ """
+
+#     # the primary_key is called class block,
+#     # pass fields to metaclass '__new__'  via _dobj_pks_pendings
+#     frame = sys._getframe(1)
+#     if not hasattr(dident, '_dobj_pks_pendings'):
+#         pendings = {}
+#         setattr(dident, '_dobj_pks_pendings', pendings)
+#     else:
+#         pendings = getattr(dident, '_dobj_pks_pendings')
+
+#     pks = []
+#     for field in fields:
+#         if not isinstance(field, datt):
+#             errmsg = 'the primary key \'%s\' is not datt' % field
+#             raise TypeError(errmsg)
         
-        pks.append(field)
-        field.is_identity = True
+#         pks.append(field)
+#         field.is_identity = True
 
-    f_locals = frame.f_locals
-    pendings[f_locals['__module__'] + '.' + f_locals['__qualname__']] = pks
+#     f_locals = frame.f_locals
+#     pendings[f_locals['__module__'] + '.' + f_locals['__qualname__']] = pks
 
+# identity = dident
 
 class DObjectMetaClass(type):
 
@@ -67,15 +70,21 @@ class DObjectMetaClass(type):
     def __new__(metacls, classname, bases, class_dict):
 
 
-        if hasattr(dident, '_dobj_pks_pendings'):
-            pk_pendings = getattr(dident, '_dobj_pks_pendings')
-            qclsname = class_dict.get('__module__') + '.' + class_dict.get('__qualname__')
-            if qclsname in pk_pendings:
-                pkeys = pk_pendings.pop(qclsname)
-            else:
-                pkeys = []
+        if '__primary_key__' in class_dict:
+            pkeys = list(class_dict.get('__primary_key__'))
         else:
-            pkeys = []
+            pkeys = []            
+
+
+        # if hasattr(dident, '_dobj_pks_pendings'):
+        #     pk_pendings = getattr(dident, '_dobj_pks_pendings')
+        #     qclsname = class_dict.get('__module__') + '.' + class_dict.get('__qualname__')
+        #     if qclsname in pk_pendings:
+        #         pkeys = pk_pendings.pop(qclsname)
+        #     else:
+        #         pkeys = []
+        # else:
+        #     pkeys = []
 
 
         fields = OrderedDict()
@@ -94,6 +103,8 @@ class DObjectMetaClass(type):
 
 
         cls = type.__new__(metacls, classname, bases, class_dict)
+        cls.__primary_key__ = pkeys
+
         cls._dobj_fields = fields
         
         id_fields = [p.name for p in pkeys]
@@ -114,7 +125,9 @@ class DObjectMetaClass(type):
                         errmsg = "The id-attribute '%s' cannot be none" % attrname
                         raise TypeError(errmsg) 
                     values.append(val)
-                return id_type(*values)
+
+                obj_id = id_type(*values)
+                return obj_id
             
             return None
 
@@ -171,19 +184,16 @@ class datt:
             raise TypeError(errmsg)
 
         attrs  = getattr(instance, '_dobject__attrs')
-        now_val = attrs.get(name, None)
-        value   = cast_attr_value(name, value, self.datatype)  
+        if hasattr(self.datatype, '__setter_filter__'):
+            value = self.datatype.__setter_filter__(value)
+        else:
+            value   = cast_attr_value(name, value, self.datatype)  
+        
+        attrs[name] = value
 
-        if now_val != value :
-            attrs[name] = value
-
-            # changed = getattr(instance, '_dobject__orig')
-            # old_val = changed.get(name, None)
-            # if old_val == value : # the value is recoveried
-            #     del changed[name]
-            # else:
-            #     if name not in changed:
-            #         changed[name] = now_val
+        # now_val = attrs.get(name, None)
+        # if now_val != value :
+        #     attrs[name] = value
 
     def __delete__(self, instance):
         raise NotImplemented('unsupported field deleting')
@@ -205,10 +215,7 @@ class AggregateAttr:
             return self
 
         val = getattr(instance, '_dobject__attrs').get(self.name)
-
         return val
-
-        # return getattr(instance, '_dobject__attrs').get(self.name)
 
     def __set__(self, instance, value):
         oldval = getattr(instance, '_dobject__attrs').get(self.name)
@@ -236,6 +243,8 @@ class dset(daggregate):
     """
     The aggregate object set of domain object.
     """
+
+    item_type = None
 
     def __init__(self, item_type, iterable=None, doc=None):
         self.__list = []
@@ -269,9 +278,8 @@ class dset(daggregate):
 
         obj_id = obj._dobj_id
         if not obj_id:
-            errmsg = "The identity(%s) of %s is required" 
-            errmsg %= (','.join(self.__class__._dobj_id_names, 
-                       self.__class__.__name__))
+            errmsg = "The item's identity of %s is required" 
+            errmsg %= obj.__class__.__name__
             raise TypeError(errmsg)
         
         if obj_id in self.__map:
