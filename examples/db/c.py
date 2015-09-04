@@ -47,7 +47,6 @@ def test():
     """ 
 
 
-
     dbc << 'SELECT * FROM test_item'
     data = dset(test_item, dbc)
 

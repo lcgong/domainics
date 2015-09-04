@@ -13,6 +13,8 @@ from . import json
 from .util import iter_submodules
 from .domobj import DObjectMetaClass, dobject, datt, dset
 
+import textwrap
+
 class dtable(dobject):
     pass
 
@@ -80,14 +82,16 @@ def repr_create_table(dobj_cls):
 
     if hasattr(dobj_cls, '__doc__') and dobj_cls.__doc__:
         if dobj_cls.__doc__:
+            doc = textwrap.dedent(dobj_cls.__doc__)
             sql = "COMMENT ON TABLE %s IS '%s';"
-            sql %= (table_name, quote(dobj_cls.__doc__))
+            sql %= (table_name, quote(doc))
             yield sql
 
     for name, attr in dobj_cls._dobj_attrs.items():
         if attr.doc:
+            doc = textwrap.dedent(attr.doc)
             sql = "COMMENT ON COLUMN %s.%s IS '%s';" 
-            sql %= (table_name, name, quote(attr.doc))
+            sql %= (table_name, name, quote(doc))
             yield sql       
 
 def repr_datatype(dtype, length=None):
@@ -103,10 +107,21 @@ def repr_datatype(dtype, length=None):
             datatype = 'BIGINT'
 
     elif dtype == str:
+
         if not length:
             datatype = 'TEXT'
         else:
+            # print('%r, %s' % (length, length.__class__))
             datatype = 'VARCHAR(%d)' % length
+
+    elif dtype == float:
+        if length is not None:
+            datatype = 'FLOAT(%d)' % length
+        else:
+            datatype = 'FLOAT' # 8 bytes    
+
+    elif dtype == bool:
+        datatype = 'BOOLEAN'    
 
     elif dtype == Decimal:
         if not length:
@@ -119,6 +134,9 @@ def repr_datatype(dtype, length=None):
 
     elif dtype == datetime.date:
         datatype = 'DATE'
+
+    elif issubclass(dtype, datetime.datetime):
+        datatype = 'TIMESTAMP'
 
     elif issubclass(dtype, dsequence):
         if not length:
@@ -147,9 +165,21 @@ def repr_create_sequence(dobj_cls):
         'CREATE SEQUENCE ', dobj_cls.__name__,  
         ' INCREMENT BY ', repr(step), 
         ' START WITH ', repr(start), ';' 
-        ]
+        ]    
+
     s = ''.join(s)
+
     yield s
+
+
+    quote = lambda s : s.replace("'", "''")
+    if hasattr(dobj_cls, '__doc__') and dobj_cls.__doc__:
+        if dobj_cls.__doc__:
+
+            doc = textwrap.dedent(dobj_cls.__doc__)
+            sql = "COMMENT ON SEQUENCE %s IS '%s';"
+            sql %= (dobj_cls.__name__, quote(doc))
+            yield sql
 
 def repr_drop_table(dobj_cls):
     s = "DROP TABLE IF EXISTS %s;" 
@@ -225,6 +255,10 @@ class DBSchema:
 
     def add_module(self, root_module):
         """ """
+
+        table_names = OrderedDict()
+        seen   = set()
+
         for module in iter_submodules(root_module):
             for objname in dir(module):
                 obj = getattr(module, objname)
@@ -238,28 +272,68 @@ class DBSchema:
                 if obj is dtable or obj is dsequence:
                     continue
 
+                qual_name = obj.__module__ + '.' + obj.__name__
+
+                if qual_name in seen:
+                    continue
+                
+                seen.add(qual_name)
+
+                if obj.__name__ in table_names:
+                    errmsg = "Database relation '%s' has already been defined in %s" 
+                    errmsg %= (obj.__name__, table_names[obj.__name__])
+                    raise TypeError(errmsg)
+                
+                table_names[obj.__name__] = qual_name
+
                 self.schema_objs.append(obj)
 
     def create(self):
+        if not self.schema_objs:
+            return
+
+        seen = set()
+
         stmts = ['\n']
         for db_cls in self.schema_objs:
-            if issubclass(db_cls, dtable):
-                for stmt in repr_create_table(db_cls):
-                    stmts.append(stmt)
-            elif issubclass(db_cls, dsequence):
-                for stmt in repr_create_sequence(db_cls):
-                    stmts.append(stmt)
-        
+            cls_name = db_cls.__module__ + '.' + db_cls.__name__
+
+            if cls_name in seen:
+                continue
+
+            try :
+                if issubclass(db_cls, dtable):
+                    seen.add(cls_name)
+                    for stmt in repr_create_table(db_cls):
+                        stmts.append(stmt)
+                elif issubclass(db_cls, dsequence):
+                    seen.add(cls_name)
+                    for stmt in repr_create_sequence(db_cls):
+                        stmts.append(stmt)
+            except Exception as ex:
+                errmsg = 'caught exception while scheming %s' % (db_cls.__name__)
+                raise TypeError(errmsg) from ex
+
         stmts = '\n'.join(stmts)
         self.__tfunc(stmts)
 
     def drop(self):
+        if not self.schema_objs:
+            return
+
+        seen = set()
+
         stmts = ['\n']
         for db_cls in self.schema_objs:
+            if db_cls in seen:
+                continue
+
             if issubclass(db_cls, dtable):
+                seen.add(db_cls)
                 for stmt in repr_drop_table(db_cls):
                     stmts.append(stmt)
             elif issubclass(db_cls, dsequence):
+                seen.add(db_cls)
                 for stmt in repr_drop_sequence(db_cls):
                     stmts.append(stmt)
 

@@ -18,6 +18,7 @@ from ..pillar import _pillar_history, pillar_class
 from ..util import iter_submodules
 
 
+
 class RouteError:
     pass
 
@@ -115,7 +116,9 @@ class WebApp:
             segs.append(s)
             handlers.append((path_ptn, hcls, params))
 
+
         _logger.info('\n'.join(segs))
+        print(444, '\n'.join(segs))
 
         if 'cookie_secret' not in self.settings:
             self.settings['cookie_secret'] = generate_cookie_secret()

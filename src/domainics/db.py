@@ -2,7 +2,7 @@
 
 import logging
 
-_logger = logging.getLogger(__name__)
+# _logger = logging.getLogger(__name__)
 
 import functools
 from collections  import OrderedDict as _OrderedDict
@@ -90,8 +90,9 @@ class BaseSQLBlock:
 
         self._cur_record_type = None
         self.__todo_sqlstmt   = None
+
+        self._logger = logging.getLogger(__name__)
         
-                    
     def __enter__(self):
         self._open()
         return self
@@ -102,7 +103,7 @@ class BaseSQLBlock:
             cur  = self._cursor
             if not conn.autocommit and ev :
                 conn.rollback()
-                _logger.warning("transaction rollbacked", exc_info=ev)
+                self._logger.warning("transaction rollbacked", exc_info=ev)
             else:
                 conn.commit()
         finally:
@@ -149,41 +150,10 @@ class BaseSQLBlock:
             err %= stmt_or_params
             raise TypeError(err)
 
-        
         return self
 
-    # def __imod__(self, params):
-    #     """push SQL params to dbc, and execute the pending sql. 
-    #     The params is a tuple or dict of parameters. 
-    #     If the params is a list, the many params are provided.
-    #     """
-    #     if not self.__todo_sqlstmt:
-    #         err = 'NO SQL statement to solve the parameters: %r'
-    #         err %= params
-    #         raise ValueError(err)
-
-    #     if isinstance(params, list):
-    #         self.__execute(self.__todo_sqlstmt, many=params)
-    #         # self.__todo_sqlstmt = None
-    #     elif isinstance(params, tuple) or isinstance(params, dict):
-    #         self.__execute(self.__todo_sqlstmt, params=params)        
-    #         # self.__todo_sqlstmt = None
-    #     else:
-    #         err = 'parameters should be a tuple, dict and list: %r'
-    #         err %= params
-    #         raise TypeError(err)
-
-    #     return self
-
-    # def __call__(self, sql, params=None, many=None):
-    #     if many is not None:
-    #         self._cursor.executemany(sql, many)
-    #     else:
-    #         self._cursor.execute(sql, params)
-
-    #     self._iter = None
-
     def __execute(self, sql, params=None, many=None):
+
         if many is not None:
             self._cursor.executemany(sql, many)
         else:

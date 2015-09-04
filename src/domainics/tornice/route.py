@@ -14,7 +14,10 @@ from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject
 from ..error  import AuthenticationError
-from .. import json
+from .. import json as _json
+
+from ..business import _busilogic_pillar, BusinessLogicLayer
+
 
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
@@ -234,112 +237,88 @@ def _parse_route_rule(rule):
     return pattern, dict(factories)
 
 
-def _http_delegate(handler, func, *args, **kwargs):
-    return func(*args, **kwargs)
+class BaseRequestHandler(RequestHandler):
 
-def _http_delegate_error(handler, status_code, **kwargs):
-    exc_type, exc_val, exc_tb = kwargs['exc_info']
-
-    if isinstance(exc_val, HTTPError):
-        status_code = exc_val.status_code
-        reason = exc_val.reason if hasattr(exc_val, 'reason') else None
-        message = exc_val.log_message
-    else:
-        status_code = 500
-        reason='Server Exception'
-        message = str(exc_val)
-    
-    tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
-    path = handler.request.path
-    errmsg = [
-        '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
-        'This request (%s) was handled by %s' % (path, handler.handler_name)
-    ]
-    _logger.error('. '.join(errmsg), exc_info=True)
-
-    for tb in tb_list:
-        errmsg.append('    at %s, code: %s' % (tb['at'], tb['code']))
-    errmsg = '\n'.join(errmsg)
-
-    handler.set_status(status_code, reason=reason)
-    handler.set_header('Content-Type', 'text/plain;charset=UTF-8')
-    handler.write(errmsg)
-
-    
+    @property
+    def logger(self):
+        if hasattr(self, '_logger'):
+            return self._logger
+        self._logger = logging.getLogger(self.handler_name + '.request')
+        return self._logger
 
 
-def _json_rest_delegate(handler, func, *args, **kwargs):
+    @property
+    def principal_id(self):
+        if hasattr(self, '__tornice_principal'):
+            return getattr(self, '__tornice_principal')
 
-    if 'jsonbody' in kwargs:
-        body_data = handler.request.body
-        if body_data : # if no body data, here is empty byte data
-            kwargs['jsonbody'] = json.loads(body_data.decode('UTF-8'))
-        else:
-            kwargs['jsonbody'] = None
+        value = self.get_secure_cookie('tornice_principal')
+        if value is not None:
+            value = value.decode('utf-8')
+        setattr(self, '__tornice_principal', value)
 
-    obj = func(*args, **kwargs)
-    if not isinstance(obj, (list, tuple, dset)):
-        obj = [obj]
+        return value
 
-    handler.set_header('Content-Type', 'application/json')
-    handler.write(json.dumps(obj, cls=_JSONEncoder))
-
-
-def _json_rest_delegate_error(handler, status_code, **kwargs):
+    @principal_id.setter
+    def principal_id(self, value):
+        if value is not None and not isinstance(value, str):
+            raise TypeError('principal_id should be str or None ' )
+        
+        if value is None :
+            self.clear_cookie(self._cookie_name)
+        else:        
+            # session-only cookie, expires_days=None
+            self.set_secure_cookie('tornice_principal', value, 
+                                      expires_days=None, path='/', domain=None)  
             
-    exc_type, exc_val, exc_tb = kwargs['exc_info']
+        delattr(self, '__tornice_principal')
 
-    if isinstance(exc_val, HTTPError):
-        status_code = exc_val.status_code
-        reason = exc_val.reason if hasattr(exc_val, 'reason') else None
-        message = exc_val.log_message
-    else:
-        status_code = 500
-        reason='Server Exception'
-        message = str(exc_val)
-    
-    tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
-
-    path = handler.request.path
-    errmsg = [
-        '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
-        'This request (%s) was handled by %s' % (path, handler.handler_name)
-    ]
-    _logger.error('. '.join(errmsg), exc_info=True)
-
-    errobj = OrderedDict([
-            ('status_code', status_code),
-            ('error', message),
-            ('type', exc_type.__name__),
-            ('path', path),
-            ('handler', handler.handler_name),
-            ('traceback', tb_list)
-        ])
-
-    handler.set_status(status_code, reason=reason)
-    handler.set_header('Content-Type', 'application/json')
-    handler.write(json.dumps([errobj], cls=_JSONEncoder))
+    def __str__(self):
+        kwargs = self._handler_args or {}
+        segs = []
+        for arg in kwargs:
+            segs.append('%s=%r' % (arg, kwargs.get(arg, None)))
+        return self.handler_name + '(' + ', '.join(kwargs) + ') at ' + hex(id(self)) 
 
 
-proto_delegates = {
-    'HTTP' : _http_delegate,
-    'REST' : _json_rest_delegate
-}
+    def write_error(self, status_code, **kwargs):
+        exc_type, exc_val, exc_tb = kwargs['exc_info']
 
-proto_error_delegates = {
-    'HTTP' : _http_delegate_error,
-    'REST' : _json_rest_delegate_error
-}    
+        if isinstance(exc_val, HTTPError):
+            status_code = exc_val.status_code
+            reason = exc_val.reason if hasattr(exc_val, 'reason') else None
+            message = exc_val.log_message
+        else:
+            status_code = 500
+            reason='Server Exception'
+            message = str(exc_val)
+            print(messagee)
+        
+        tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
+        path = self.request.path
+        errmsg = [
+            '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
+            'This request (%s) was handled by %s' % (path, self.handler_name)
+        ]
+        _logger.error('. '.join(errmsg), exc_info=True)
 
-def _wrap_handler(func, proto, pargs, qargs):
-    proto_delegate = proto_delegates[proto.upper()]
+        for tb in tb_list:
+            errmsg.append('    at %s, code: %s' % (tb['at'], tb['code']))
+        errmsg = '\n'.join(errmsg)
 
-    nodefault_params = set()
-    for param in inspect.signature(func).parameters.values():
-        if param.default is param.empty:
-            nodefault_params.add(param.name)
+        self.set_status(status_code, reason=reason)
+        self.set_header('Content-Type', 'text/plain;charset=UTF-8')
+        self.write(errmsg)
 
-    def handler_func(self, *args, **kwargs):
+    def do_handler_func(self, *args, **kwargs) :
+
+        nodefault_params = set()
+        for param in inspect.signature(self.handler_func).parameters.values():
+            if param.default is param.empty:
+                nodefault_params.add(param.name)        
+
+        pargs = self.req_path_args
+        qargs = self.req_query_args
         for arg in kwargs:
             if arg in pargs and pargs[arg] != str:
                 kwargs[arg] = pargs[arg](kwargs[arg])
@@ -355,97 +334,93 @@ def _wrap_handler(func, proto, pargs, qargs):
         def exit_callback(exc_type, exc_val, tb):
             self._handler_args = None
 
-        bound_func = _pillar_history.bound(func, 
-                                           [(_request_handler_pillar, self)], 
+
+        busilogic_layer = BusinessLogicLayer(self.handler_name, self.principal_id)
+
+        bound_func = _pillar_history.bound(self.handler_func, 
+                                           [(_request_handler_pillar, self),
+                                           (_busilogic_pillar, busilogic_layer)], 
                                            exit_callback)
         
-        return proto_delegate(self, bound_func, *args, **kwargs)
-
-    return handler_func
-
-# def _str_handler_class(cls):
-#     return '<func \'' + hndlname + '(' + ','.join(func_args) + ')\'>'
-
-def _str_handler_object(self):
-    kwargs = self._handler_args or {}
-    segs = []
-    for arg in func_args:
-        segs.append('%s=%r' % (arg, kwargs.get(arg, None)))
-    return hndlname + '(' + ', '.join(func_args) + ') at ' + hex(id(self)) 
+        return bound_func(*args, **kwargs)
 
 
-class PrincipalProperty:
-    """The principal of the authenticated session. 
-    If it is unauthenticated, AuthenticationError is raised.
-
-    If principal be set None or principal deleted, 
-    it  will clear this authenticated session. 
-    """
-
-    _cookie_name = '_tornice_principal'
-
-    def __get__(self, handler, owner):
-        if handler._tornice_principal is not None:
-            return handler._tornice_principal
+class RESTRequestHandler(BaseRequestHandler):
 
 
-        value = handler.get_secure_cookie(self._cookie_name)
-        if value is not None:
-            handler._tornice_principal = value
-            return value.decode('utf-8')
+    def do_handler_func(self, *args, **kwargs):
 
-        raise AuthenticationError('This session is unauthenticated')
+        if 'jsonbody' in kwargs:
+            body_data = self.request.body
+            if body_data : # if no body data, here is empty byte data
+                kwargs['jsonbody'] = _json.loads(body_data.decode('UTF-8'))
+            else:
+                kwargs['jsonbody'] = None
 
+        obj = super(RESTRequestHandler, self).do_handler_func(*args, **kwargs)
 
-    def __set__(self, handler, value):
-        if value is not None and not isinstance(value, str):
-            errmsg ='principal value should be str type, not ' 
-            errmsg += '' 
-            raise ValueError(errmsg)
-        
-        if value is None :
-            handler.clear_cookie(self._cookie_name)
-            handler._tornice_principal = None
-            return 
-        
-        # session-only cookie, expires_days=None
-        handler.set_secure_cookie(self._cookie_name, value, 
-                                  expires_days=None, path='/', domain=None)  
-        handler._tornice_principal = value    
+        # obj = func(*args, **kwargs)
+        if not isinstance(obj, (list, tuple, dset)):
+            obj = [obj]
+
+        self.set_header('Content-Type', 'application/json')
+        self.write(_json.dumps(obj))
 
 
+    def write_error(self, status_code, **kwargs):
+        exc_type, exc_val, exc_tb = kwargs['exc_info']
 
-
-def _make_handler_class(handler_func, proto, methods, pargs, qargs):
-
-    func_sig    = inspect.signature(handler_func).parameters
-
-    func_args = OrderedDict()
-    for arg in func_sig:
-        if arg in pargs:
-            func_args[arg] = pargs[arg]
-        elif arg in qargs:
-            func_args[arg] = qargs[arg]
+        if isinstance(exc_val, HTTPError):
+            status_code = exc_val.status_code
+            reason = exc_val.reason if hasattr(exc_val, 'reason') else None
+            message = exc_val.log_message
         else:
-            func_args[arg] = None
+            status_code = 500
+            reason='Server Exception'
+            message = str(exc_val)
 
 
-    typename = handler_func.__name__ + '_handler'
-    hndlname = handler_func.__module__ + '.' + handler_func.__name__
+        tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
 
-    delegate_func = _wrap_handler(handler_func, proto, pargs, qargs)
-    delegate_err  = proto_error_delegates.get(proto)
-    attrs = OrderedDict()
-    for m in methods:
-        attrs[m.lower()]  = delegate_func
-    attrs['_tornice_principal'] = None
-    attrs['__str__']      = _str_handler_object
-    attrs['handler_name'] = hndlname
-    attrs['principal']    = PrincipalProperty()
-    if delegate_err:
-        attrs['write_error'] = delegate_err
+        errmsg = '%s[%d, %s]: %s' 
+        errmsg %= (exc_type.__name__, status_code, self.request.path, message)
+        self.logger.error(errmsg, exc_info=kwargs['exc_info'])
+
+        errobj = OrderedDict([
+                ('status_code', status_code),
+                ('error', message),
+                ('type', exc_type.__name__),
+                ('path', self.request.path),
+                ('handler', self.handler_name),
+                ('traceback', tb_list)
+            ])
+
+        self.set_status(status_code, reason=reason)
+        self.set_header('Content-Type', 'application/json')
+        self.write(_json.dumps([errobj]))
+
+
+
+
+def _make_handler_class(func, proto, methods, pargs, qargs):
     
-    newcls = type(typename, (RequestHandler,), attrs)
+    attrs = dict(
+        # func is function that has no 'self' parameter
+        handler_func    = staticmethod(func), 
+        handler_name    = func.__module__ + '.' + func.__name__,
+        req_path_args   = pargs,
+        req_query_args  = qargs
+        )
+    
+    
+    if proto == 'REST':
+        base_class = RESTRequestHandler
+    elif proto == 'HTTP':
+        base_class = BaseRequestHandler
 
+    cls = type(func.__name__ + '_handler', (base_class,), attrs)
+    for m in methods:
+        setattr(cls, m.lower(), cls.do_handler_func) 
+    
+    return cls
 
-    return newcls

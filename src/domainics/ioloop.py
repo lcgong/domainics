@@ -6,14 +6,7 @@ def run(title=None, logging=True) :
     """服务主调度"""
 
     if title is None:
-        title = 'WebServer / Tornado'
-    
-    if logging:
-        # 设置日志级别
-        import logging
-        logging.getLogger("tornado.access").setLevel(logging.INFO)
-        logging.getLogger("tornado.application").setLevel(logging.DEBUG)
-        logging.getLogger("tornado.general").setLevel(logging.INFO)
+        title = 'Tornado'
 
     import tornado.ioloop
     server = tornado.ioloop.IOLoop.instance() 

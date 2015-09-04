@@ -8,16 +8,13 @@ import os.path as fp
 
 from domainics import set_dsn
 
+
 def _get_home_path():
 
     main_file = sys.modules['__main__'].__file__
     
-    # guess the homepath of the main module
     homepath = fp.abspath(fp.dirname(main_file))
-    # while True:
-    #     if not fp.exists(fp.join(homepath, '__init__.py')):
-    #         break
-    #     homepath = fp.abspath(fp.join(homepath, os.pardir))
+
     
     return homepath
 
@@ -43,6 +40,10 @@ def load(homepath=None):
 
     _logger = logging.getLogger(__name__)
     _logger.info('configuration loaded, ' + conf_file) 
+
+    abcs =logging.getLogger('abcs')
+
+    abcs.info('test')
      
     conf_file = fp.join(conf_dir, 'database.yaml')
     if fp.exists(conf_file):
@@ -59,4 +60,4 @@ def load(homepath=None):
 
     _logger.info('configuration loaded, ' + conf_file)                       
 
-load()
+# load()

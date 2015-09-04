@@ -4,7 +4,7 @@ import json
 import datetime
 
 from . import dset, dobject
-
+from decimal import Decimal
 
 
 def loads(s):
@@ -12,11 +12,8 @@ def loads(s):
 	return json.loads(s)
 
 
-
 def dumps(obj):
 	return json.dumps(obj, cls=_JSONEncoder)	
-
-
 
 class _JSONEncoder(json.JSONEncoder):
     def default(self, obj):

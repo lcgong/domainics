@@ -51,6 +51,7 @@ class mm_po(dtable):
     notes      = tcol(str,  doc='addtional notes')
 
     tags       = tcol(array(str, dimensions=1), doc='tags')
+    tags       = tcol(array(str, dimensions=1), doc='tags')
 
     __primary_key__ = [po_sn]
 
