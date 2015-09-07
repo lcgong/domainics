@@ -2,10 +2,6 @@
 
 
 from .route import route_base, http_route, rest_route
-from .route import _request_handler_pillar
+from .funchandler import webreq
 from .app   import WebApp
-
-handler = _request_handler_pillar
-
-
 

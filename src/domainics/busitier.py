@@ -5,6 +5,17 @@ import logging
 
 from .pillar import _pillar_history, pillar_class, PillarError
 
+class SecurityException(Exception):
+    pass
+
+class UnauthorizedError(SecurityException):
+    pass
+
+class ForbiddenError(SecurityException):
+    pass
+
+class TestFailedError(Exception):
+    pass
 
 class BusinessLogicLayer:
 
@@ -20,8 +31,21 @@ class BusinessLogicLayer:
         return self.__logger
 
 
+
+    def test(self, cond, failed_msg):
+        if not cond:
+            raise TestFailedError(failed_msg)
+
+    def fail(self, msg):
+        raise TestFailedError(msg)
+
+    def unauthorized(self, msg=None):
+        raise UnauthorizedError(msg)
+
+    def forbidden(self, msg=None):
+        raise ForbiddenError(msg)
+
 _busilogic_pillar_class = pillar_class(BusinessLogicLayer)
 _busilogic_pillar = _busilogic_pillar_class(_pillar_history)
 busilogic = _busilogic_pillar
-
 

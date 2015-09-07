@@ -7,7 +7,7 @@ import re
 from psycopg2.pool import ThreadedConnectionPool
 
 
-from .db import BaseSQLBlock
+from .sqlblock import BaseSQLBlock
 from .dtable import dsequence
 
 

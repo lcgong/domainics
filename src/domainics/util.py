@@ -83,9 +83,13 @@ def filter_traceback(tb, excludes=None):
 
         tb = tb.tb_next
     return tb_list
-    
+
+
+class NamedDict:
+    pass
+
 _nameddict_class_tmpl = """
-class {typename}:
+class {typename}(NamedDict):
     __fields__ = {field_names!r}
 
     def __init__(self, {arg_list}):
@@ -139,7 +143,9 @@ def nameddict(typename, field_names):
         arg_list    = ','.join(field_names),
     )
 
-    namespace = dict(__name__='nameddict_%s' % typename, _OrderedDict=_OrderedDict)
+    namespace = dict(__name__='nameddict_%s' % typename, 
+        _OrderedDict=_OrderedDict, 
+        NamedDict=NamedDict)
     exec(class_definition, namespace)
     result = namespace[typename]
 

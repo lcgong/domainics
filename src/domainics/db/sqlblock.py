@@ -2,15 +2,13 @@
 
 import logging
 
-# _logger = logging.getLogger(__name__)
-
 import functools
 from collections  import OrderedDict as _OrderedDict
 from collections  import namedtuple  as _namedtuple
 from abc import abstractmethod
 
-from .util import nameddict   as _nameddict
-from .pillar import _pillar_history, pillar_class, PillarError
+from ..util     import nameddict   as _nameddict
+from ..pillar   import _pillar_history, pillar_class, PillarError
 
 
 _dsn_class = {}
@@ -20,10 +18,11 @@ def set_dsn(**kwargs):
     dbsys = kwargs.pop('sys', 'postgres')
     dsn   = kwargs.get('dsn', 'DEFAULT')
     if dbsys in ('postgres', 'pgsql', 'pg') :
-        import domainics.db_postgres as _pg
+        from . import pgsql as _pg
 
         _dsn_class[dsn] = _pg.PostgreSQLBlock
         _pg.PostgreSQLBlock.set_dsn(**kwargs)
+        
     elif dbsys in ('sqlite'):
         raise NotImplemented('sqlite')
 
@@ -255,7 +254,7 @@ def transaction(*d_args, dsn='DEFAULT', autocommit=False):
 
             if dbc._this_object is not None: 
                 # no allow to reenter a new transaction
-                func(*args, **kwargs)
+                return func(*args, **kwargs)
             else:
                 sqlblk = sqlblock(dsn=dsn, autocommit=autocommit)
 
@@ -267,6 +266,8 @@ def transaction(*d_args, dsn='DEFAULT', autocommit=False):
 
                 sqlblk.__enter__()
                 ret = bound_func(*args, **kwargs)
+
+                print('123', ret)
 
 
                 if hasattr(ret, '_pillar_history'):

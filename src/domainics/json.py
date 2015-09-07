@@ -3,7 +3,8 @@
 import json
 import datetime
 
-from . import dset, dobject
+from .domobj import dset, dobject
+from .db.dtable import dsequence
 from decimal import Decimal
 
 
@@ -13,9 +14,9 @@ def loads(s):
 
 
 def dumps(obj):
-	return json.dumps(obj, cls=_JSONEncoder)	
+	return json.dumps(obj, cls=DefaultJSONEncoder)	
 
-class _JSONEncoder(json.JSONEncoder):
+class DefaultJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
@@ -23,6 +24,9 @@ class _JSONEncoder(json.JSONEncoder):
             return float(obj)
         elif isinstance(obj, (dset, dobject)):
             return obj.export()
+        elif isinstance(obj, (dset, dsequence)):
+            return int(obj)        
         else:
-            return super(DJSONEncoder, self).default(obj)
+            print(111, obj, type(obj))
+            return super(DefaultJSONEncoder, self).default(obj)
 

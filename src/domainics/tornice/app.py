@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*- 
 import logging
-_logger = logging.getLogger(__name__)
 
 import re
 import os.path
@@ -117,8 +116,7 @@ class WebApp:
             handlers.append((path_ptn, hcls, params))
 
 
-        _logger.info('\n'.join(segs))
-        print(444, '\n'.join(segs))
+        self.logger.info('\n'.join(segs))
 
         if 'cookie_secret' not in self.settings:
             self.settings['cookie_secret'] = generate_cookie_secret()
@@ -136,6 +134,16 @@ class WebApp:
         self.setup()
         import domainics.ioloop
         domainics.ioloop.run() # 服务主调度
+
+    @property
+    def logger(self):
+        if hasattr(self, '_logger'):
+            return self._logger
+
+        logger = logging.getLogger(WebApp.__module__ +'.' + WebApp.__name__)
+        setattr(self, '_logger', logger)
+        
+        return self._logger
 
 
 class StaticFileHandler(tornado.web.StaticFileHandler):

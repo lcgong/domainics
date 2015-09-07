@@ -23,7 +23,6 @@ by forbidding external objects from holding references to its members.
 """
 
 import logging
-_logger = logging.getLogger(__name__)
 
 import sys
 import inspect
@@ -33,7 +32,7 @@ from collections import namedtuple
 import datetime as dt
 from decimal import Decimal
 
-
+from .util import NamedDict
 
 # def dident(*fields):
 #     """ """
@@ -607,7 +606,64 @@ class dobject(metaclass=DObjectMetaClass):
 
         return self
 
+    def fillwith(self, src):
+        if src is None:
+            return self
 
+        if isinstance(src, dict):
+            for attr_name in self.__class__._dobj_attrs:
+                if attr_name not in src:
+                    continue
+
+                ths_val = self.__attrs.get(attr_name, None)
+                src_val = src[attr_name]
+                if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
+                    ths_val.fillwith(src_val)
+                    continue
+
+                if ths_val == src_val:
+                    continue
+
+                self.__attrs[attr_name] = src_val
+
+        # elif isinstance(src, dobject):
+        #     src_attrs = getattr(src, '_dobject__attrs')
+            
+        #     for attr_name in self.__class__._dobj_attrs:
+        #         if attr_name not in src_attrs:
+        #             continue
+
+
+        #         ths_val = self.__attrs.get(attr_name, None)
+        #         src_val = src_attrs[attr_name]
+        #         if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
+        #             ths_val.fillwith(src_val)
+        #             continue
+
+        #         if ths_val == src_val:
+        #             continue
+
+        #         self.__attrs[attr_name] = src_val
+
+        elif isinstance(src, (dobject, NamedDict)):
+            for attr_name in self.__class__._dobj_attrs:
+                if not hasattr(src, attr_name):
+                    continue
+
+                ths_val = getattr(self, attr_name, None)
+                src_val = getattr(src, attr_name)
+                if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
+                    ths_val.fillwith(src_val)
+                    continue
+
+                if ths_val == src_val:
+                    continue
+
+                setattr(self, attr_name, src_val)
+        else:
+            raise TypeError('Unknown type: ' + src.__class__.__name__)
+
+        return self
 
 def cast_attr_value(attrname, val, datatype):
     if val is None:

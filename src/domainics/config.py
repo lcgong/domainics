@@ -6,7 +6,7 @@ import sys
 import os
 import os.path as fp
 
-from domainics import set_dsn
+from domainics.db import set_dsn
 
 
 def _get_home_path():
