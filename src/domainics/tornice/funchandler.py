@@ -148,7 +148,7 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
         if not isinstance(obj, (list, tuple, dset)):
             obj = [obj]
 
-        self.set_header('Content-Type', 'application/json')
+        self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps(obj))
 
 
