@@ -2,20 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import logging
-
-from .pillar import _pillar_history, pillar_class, PillarError
-
-class SecurityException(Exception):
-    pass
-
-class UnauthorizedError(SecurityException):
-    pass
-
-class ForbiddenError(SecurityException):
-    pass
-
-class TestFailedError(Exception):
-    pass
+from .pillar import _pillar_history, pillar_class
+from .exception import UnauthorizedError, ForbiddenError, BusinessLogicError
 
 class BusinessLogicLayer:
 
@@ -37,7 +25,7 @@ class BusinessLogicLayer:
             raise TestFailedError(failed_msg)
 
     def fail(self, msg):
-        raise TestFailedError(msg)
+        raise BusinessLogicError(msg)
 
     def unauthorized(self, msg=None):
         raise UnauthorizedError(msg)
