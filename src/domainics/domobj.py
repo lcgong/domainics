@@ -26,6 +26,7 @@ import logging
 
 import sys
 import inspect
+from itertools import chain as iter_chain
 from collections import OrderedDict
 from collections import namedtuple
 
@@ -34,31 +35,69 @@ from decimal import Decimal
 
 from .util import NamedDict
 
-# def dident(*fields):
-#     """ """
+from collections.abc import Iterable
 
-#     # the primary_key is called class block,
-#     # pass fields to metaclass '__new__'  via _dobj_pks_pendings
-#     frame = sys._getframe(1)
-#     if not hasattr(dident, '_dobj_pks_pendings'):
-#         pendings = {}
-#         setattr(dident, '_dobj_pks_pendings', pendings)
-#     else:
-#         pendings = getattr(dident, '_dobj_pks_pendings')
+"""
 
-#     pks = []
-#     for field in fields:
-#         if not isinstance(field, datt):
-#             errmsg = 'the primary key \'%s\' is not datt' % field
-#             raise TypeError(errmsg)
-        
-#         pks.append(field)
-#         field.is_identity = True
+    dobject classs
+    attrs:
+        :__primary_key__: It is a attribute dictionary of primary key of domain object
+        :__value_attrs__: It is a attribute dictionary of non primary key of domain object
 
-#     f_locals = frame.f_locals
-#     pendings[f_locals['__module__'] + '.' + f_locals['__qualname__']] = pks
+    dobject object
 
-# identity = dident
+        :__primary_key__: It is a object of PrimaryKey that is a compound 
+                          of attribute value as a primary key of the domain object. 
+"""
+
+
+
+_primary_key_class_tmpl = """\
+class PK:
+    "Primary Key of dobject"
+
+    __slots__ = ('__value_dict__')
+
+    def __init__(self, value_dict):
+        self.__value_dict__ = value_dict
+
+    def __repr__(self):
+        expr = ','.join(['%s=%r' % (attr_name, getattr(self, attr_name)) 
+                         for attr_name in primary_key])
+
+        return self.__class__.__name__ + '(' + expr + ')'
+
+    def __tuple__(self):
+        return tuple(getattr(self, attr_name) 
+                        for attr_name in primary_key)
+
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+
+"""
+
+_primary_key_prop_tmpl ="""\
+    {attr_name} = property(lambda self: self.__value_dict__.get('{attr_name}'))
+"""
+
+def _make_pkey_class(cls, pkey_attrs):
+    """Make PrimaryKey class"""
+
+    properties = []
+    for attr_name in pkey_attrs:
+        prop = _primary_key_prop_tmpl.format(**dict(attr_name=attr_name))
+        properties.append(prop)
+
+    properties = '\n'.join(properties)
+
+    class_code = _primary_key_class_tmpl + '\n' + properties
+    namespace  = dict(primary_key=pkey_attrs)
+    
+    exec(class_code, namespace)
+    cls = namespace['PK']
+
+    return cls
+
 
 class DObjectMetaClass(type):
 
@@ -68,121 +107,111 @@ class DObjectMetaClass(type):
 
     def __new__(metacls, classname, bases, class_dict):
 
+        pkey_attrs = OrderedDict()
+        value_attrs = OrderedDict()
+        for base_cls in reversed(bases): # overwriting priority, keep the first.
+            attrs = getattr(base_cls, '__primary_key__')
+            if attrs is not None:
+                pkey_attrs.update(attrs)
 
-        if '__primary_key__' in class_dict:
-            pkeys = list(class_dict.get('__primary_key__'))
-        else:
-            pkeys = []            
+            attrs = getattr(base_cls, '__value_attrs__')
+            if attrs is not None:
+                value_attrs.update(attrs)
+        
+        primary_key = class_dict.pop('__primary_key__', None)
 
-
-        # if hasattr(dident, '_dobj_pks_pendings'):
-        #     pk_pendings = getattr(dident, '_dobj_pks_pendings')
-        #     qclsname = class_dict.get('__module__') + '.' + class_dict.get('__qualname__')
-        #     if qclsname in pk_pendings:
-        #         pkeys = pk_pendings.pop(qclsname)
-        #     else:
-        #         pkeys = []
-        # else:
-        #     pkeys = []
-
-
-        fields = OrderedDict()
-        # set all names of domain field 
-        for name in class_dict:
-            attr = class_dict[name]
-            if isinstance(attr, datt):
-                attr.name    = name
-                fields[name] = attr
-            elif isinstance(attr, dset):
+        attributes = []
+        for attr_name, descriptor in class_dict.items():
+            
+            if isinstance(descriptor, datt):
+                pass
+            elif isinstance(descriptor, dset):
                 # In class-block, dset is used, replace it with AggregateAttr
-                attr = AggregateAttr(dset, attr.item_type, attr.__doc__)
-                attr.name        = name
-                class_dict[name] = attr
-                fields[name]     = attr
+                descriptor = AggregateAttr(dset, v.item_type, descriptor.__doc__)
+                class_dict[attr_name] = descriptor
+            else:
+                continue
+
+            descriptor.name = attr_name # give the attribute descriptor a name
+
+            attributes.append(descriptor)
+
+        pkey_names = set()
+        if primary_key:
+            if isinstance(primary_key, datt):
+                pkey_names.add(primary_key.name)
+            elif isinstance(primary_key, Iterable):
+                for attr in primary_key:
+                    pkey_names.add(attr.name)
+            else:
+                raise TypeError('__primary_key__ should be a datt object ' 
+                                'or an iterable of datt object')
+        
+        if pkey_names:
+            # If available, the primary key declaration overrides parent's
+            pkey_attrs.clear()  # clear base class's primary key
+        
+        for attr in attributes:
+            if attr.name in pkey_names:
+                pkey_attrs[attr.name] = descriptor
+            else:
+                value_attrs[attr.name] = descriptor
 
 
         cls = type.__new__(metacls, classname, bases, class_dict)
-        cls.__primary_key__ = pkeys
-
-        cls._dobj_fields = fields
         
-        id_fields = [p.name for p in pkeys]
-        cls._dobj_id_names = id_fields
-
-        # assemble the _dobj_id property
-        if id_fields:
-            id_type   = namedtuple('ID', id_fields)
-
-        def _get_dobj_id(self):
-            """return the identity object of domain object; None if no identity is defined"""
-
-            if self.__class__._dobj_id_names:
-                values = []
-                for attrname in id_fields:
-                    val = getattr(self, attrname)
-                    if val is None:
-                        errmsg = "The id-attribute '%s' cannot be none" % attrname
-                        raise TypeError(errmsg) 
-                    values.append(val)
-
-                obj_id = id_type(*values)
-                return obj_id
-            
-            return None
-
-        cls._dobj_id = property(_get_dobj_id)
-
+        setattr(cls, '__primary_key_class__', _make_pkey_class(cls, pkey_attrs))
+        setattr(cls, '__primary_key__', pkey_attrs)
+        setattr(cls, '__value_attrs__', value_attrs)
 
         return cls
 
 
-    @property
-    def _dobj_attrs(cls):
-        if hasattr(cls, '__dobj_attr_dict'):
-            return getattr(cls, '__dobj_attr_dict')
+    # @property
+    # def _dobj_attrs(cls):
+    #     if hasattr(cls, '__dobj_attr_dict'):
+    #         return getattr(cls, '__dobj_attr_dict')
         
-        mro_attrs = OrderedDict()
-        for c in cls.__mro__:
-            if c == dobject:
-                break
+    #     mro_attrs = OrderedDict()
+    #     for c in cls.__mro__:
+    #         if c == dobject:
+    #             break
 
-            for name, attr in c._dobj_fields.items():
-                if name in mro_attrs:
-                    continue
+    #         for name, attr in c._dobj_fields.items():
+    #             if name in mro_attrs:
+    #                 continue
 
-                mro_attrs[name] = attr
+    #             mro_attrs[name] = attr
 
-        setattr(cls, '__dobj_attr_dict', mro_attrs)
-        return mro_attrs
+    #     setattr(cls, '__dobj_attr_dict', mro_attrs)
+    #     return mro_attrs
 
 
 class datt:
     """ """
 
-    __slots__ = ('name', 'datatype', 'default_expr', 'default', 'doc', 'is_identity')
+    __slots__ = ('name', 'datatype', 'default_expr', 'default', 'doc', 'primary_key')
 
     def __init__(self, type=object, expr=None, default=None, doc=None):
         self.datatype     = type
         self.default_expr = expr
         self.default      = default
         self.doc          = doc
-        self.is_identity  = False
+        self.primary_key  = False
 
 
     def __get__(self, instance, owner):
         if instance is None: # get domain field
             return self
 
-        attrs = getattr(instance, '_dobject__attrs')
-        return attrs.get(self.name)
+        return getattr(instance, '__value_dict__').get(self.name)
 
     def __set__(self, instance, value):
         name = self.name
-        if self.is_identity:
-            errmsg = "The identity attribute '%s' is read-only" % self.name
-            raise TypeError(errmsg)
+        if self.primary_key:
+            raise ValueError("The primary key attribute '%s' is read-only" % name)
 
-        attrs  = getattr(instance, '_dobject__attrs')
+        attrs  = getattr(instance, '__value_dict__')
         if hasattr(self.datatype, '__setter_filter__'):
             value = self.datatype.__setter_filter__(value)
         else:
@@ -190,12 +219,6 @@ class datt:
         
         attrs[name] = value
 
-        # now_val = attrs.get(name, None)
-        # if now_val != value :
-        #     attrs[name] = value
-
-    def __delete__(self, instance):
-        raise NotImplemented('unsupported field deleting')
 
 
 class AggregateAttr:
@@ -213,11 +236,11 @@ class AggregateAttr:
         if instance is None: # get domain attribute
             return self
 
-        val = getattr(instance, '_dobject__attrs').get(self.name)
+        val = getattr(instance, '__value_dict__').get(self.name)
         return val
 
     def __set__(self, instance, value):
-        oldval = getattr(instance, '_dobject__attrs').get(self.name)
+        oldval = getattr(instance, '__value_dict__').get(self.name)
 
         if oldval is value:
             # operator 'o.x += a', it is translated into o.x = o.x.__iadd__(a)
@@ -456,6 +479,8 @@ class dset(daggregate):
         return self
         # operator 'o.x += a', translate into o.x = o.x.__iadd__(a)
 
+
+
 class dobject(metaclass=DObjectMetaClass):
 
     def __new__(cls, *values, **kwvalues):
@@ -466,47 +491,64 @@ class dobject(metaclass=DObjectMetaClass):
         instance = super(dobject, cls).__new__(cls)
         attr_values = OrderedDict()
         instance_setattr = super(dobject, instance).__setattr__
-        instance_setattr('_dobject__attrs', attr_values)
-        instance_setattr('_dobject__orig',  {}) # original values
+        instance_setattr('__value_dict__', attr_values)
 
-        if not values and not kwvalues:
+        if not values and not kwvalues: # empty object
             return instance
 
-        fields = []
-        for n, f in cls._dobj_attrs.items():
-            fields.append((n, f))  
+        parameters = OrderedDict(iter_chain(cls.__primary_key__.items(), 
+                                            cls.__value_attrs__.items()))
 
+        seen = set()
+        # consume parameters with the positional arguments
         for val in values:
-            name, field = fields.pop(0)
-            attr_values[name] = cast_attr_value(name, val, field.datatype)
+            if not parameters:
+                raise TypeError('Too much positional argument given')
+
+            attr_name, attr = parameters.popitem(last=False)
+            attr_values[attr_name] = cast_attr_value(attr_name, val, attr.datatype)
+            seen.add(attr_name)
+
+        # consume parameters with the keyword arguments
+        for arg_name, arg_value in kwvalues.items():
+            if arg_name in seen:
+                errmsg = "%s() got multiple values for argument '%s'"
+                errmsg %= (cls.__name__, arg_name)
+                raise TypeError(errmsg)
+
+            attr = parameters.pop(arg_name, None) 
+            if attr is None:
+                errmsg = "%s() got an unexpected keyword argument '%s'"
+                errmsg %= (cls.__name__, arg_name)
+                raise TypeError(errmsg)
+
+            if not isinstance(attr, AggregateAttr):
+                arg_value = cast_attr_value(arg_name, arg_value, attr.datatype)
+            
+            attr_values[arg_name] = arg_value
 
 
-        for name, attr in fields:
+        # set default values for these left parameters
+        for attr_name, attr in parameters.items():
             if isinstance(attr, AggregateAttr):
-                val = kwvalues.pop(name, None)
-                if val is None:
-                    val = attr.agg_type(attr.item_type)
+                attr_values[name] = attr.agg_type(attr.item_type)
             else:
-                val = kwvalues.pop(name, None)
-                val = cast_attr_value(name, val, attr.datatype)
-                if val is None: # default value
-                    if isinstance(attr.default, type):
-                        val = attr.default()
-                    elif isinstance(attr.default, 
-                            (str, int, float, Decimal, dt.date, dt.time, 
-                             dt.datetime, dt.timedelta)):
-                        val = attr.default
+                if isinstance(attr.default, type):
+                    attr_values[name] = attr.default()
+                elif isinstance(attr.default, 
+                        (str, int, float, Decimal, dt.date, dt.time, 
+                         dt.datetime, dt.timedelta)):
+                    attr_values[name] = attr.default
 
-            attr_values[name] = val
+        
+        
+        setattr(instance, '__primary_key__', cls.__primary_key_class__(attr_values))
 
-        if kwvalues:
-            errmsg = 'not defined field: ' 
-            errmsg += ', '.join([f for f in kwvalues])
-            raise ValueError(errmsg)
-
-        instance._dobj_id
 
         return instance
+
+
+
 
     def __getattr__(self, name):
         errmsg ='The domain object %s has no field: %s ' 
@@ -523,10 +565,12 @@ class dobject(metaclass=DObjectMetaClass):
 
     def __repr__(self):
         """ """
-        segs = ['%s=%r' % (a, self.__attrs.get(a)) for a in self.__attrs]
-        # if self.__orig:
-            # args = ', '.join(['%s=%r' % p for p in self.__orig.items() ])
-            # segs.append('__orig=(' + args + ')')
+        values =  self.__value_dict__
+
+        segs = [repr(self.__primary_key__)]
+        segs += ['%s=%r' % (attr_name, values.get(attr_name)) 
+                    for attr_name in self.__class__.__value_attrs__]
+
 
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
@@ -538,21 +582,21 @@ class dobject(metaclass=DObjectMetaClass):
         if other is None :
             return False
 
-        this_id = self._dobj_id
-        if this_id is not None and this_id == other._dobj_id:
+        this_id = self.__primary_key__
+        if this_id is not None and this_id == other.__primary_key__:
             return True
 
-        if set(self.__attrs.keys()) != set(other.__attrs.keys()):
+        if set(self.__value_dict__.keys()) != set(other.__value_dict__.keys()):
             return False
 
-        for name, val in self.__attrs.items():
-            if val != other.__attrs[name]:
+        for name, val in self.__value_dict__.items():
+            if val != other.__value_dict__[name]:
                 return False
         
         return True
 
     def copy(self):
-        self_attrs = getattr(self,   '_dobject__attrs')
+        self_attrs = getattr(self,   '__value_dict__')
         kwargs = OrderedDict()
         for attr_name in self_attrs:
             value = self_attrs[attr_name]
@@ -569,7 +613,7 @@ class dobject(metaclass=DObjectMetaClass):
     def export(self):
         """export dobject as list or dict """
 
-        self_attrs = getattr(self,   '_dobject__attrs')
+        self_attrs = getattr(self,   '__value_dict__')
         kwargs = OrderedDict()
         for attr_name in self_attrs:
             value = self_attrs[attr_name]
@@ -606,16 +650,34 @@ class dobject(metaclass=DObjectMetaClass):
 
         return self
 
-    def fillwith(self, src):
+    def reform(self, src, onlywith=None, ignore=None):
+        """
+        Reform the dobject with src's attribues or fields. 
+
+        A reformation of object means that the object is still the object itself. 
+        After reformation, the valide value of primary key attribute are pristine.
+        But if its value is None, and the value src's attribute are not None, 
+        the value of the dobject will be reformed.
+        """
         if src is None:
             return self
 
+        if only is not None:
+            pass
+        else:
+            pass
+
+        self_attrs = iter_chain(self.__class__.__primary_key__, 
+                                self.__class__.__value_attrs__)
+
+        self_values = self.__value_dict__
+
         if isinstance(src, dict):
-            for attr_name in self.__class__._dobj_attrs:
+            for attr_name in self_attrs:
                 if attr_name not in src:
                     continue
 
-                ths_val = self.__attrs.get(attr_name, None)
+                ths_val = self_values.get(attr_name, None)
                 src_val = src[attr_name]
                 if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
                     ths_val.fillwith(src_val)
@@ -624,28 +686,9 @@ class dobject(metaclass=DObjectMetaClass):
                 if ths_val == src_val:
                     continue
 
-                self.__attrs[attr_name] = src_val
+                self.__value_dict__[attr_name] = src_val
 
-        # elif isinstance(src, dobject):
-        #     src_attrs = getattr(src, '_dobject__attrs')
-            
-        #     for attr_name in self.__class__._dobj_attrs:
-        #         if attr_name not in src_attrs:
-        #             continue
-
-
-        #         ths_val = self.__attrs.get(attr_name, None)
-        #         src_val = src_attrs[attr_name]
-        #         if isinstance(ths_val, daggregate) or isinstance(ths_val, dobject):
-        #             ths_val.fillwith(src_val)
-        #             continue
-
-        #         if ths_val == src_val:
-        #             continue
-
-        #         self.__attrs[attr_name] = src_val
-
-        elif isinstance(src, (dobject, NamedDict)):
+        elif isinstance(src, (dobject, NamedDict)): # support domobj and sqlblock
             for attr_name in self.__class__._dobj_attrs:
                 if not hasattr(src, attr_name):
                     continue
