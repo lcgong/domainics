@@ -255,7 +255,7 @@ class dset(daggregate):
 
     item_type = None
 
-    def __init__(self, item_type, iterable=None, doc=None):
+    def __init__(self, item_type, iterable=None, doc=None, primary_key=None):
         self.__list = []
         self.__map  = {}
 
@@ -263,6 +263,64 @@ class dset(daggregate):
             raise TypeError('item_type should be a type object')
 
         self.item_type   = item_type
+
+        if primary_key is not None:
+            if isinstance(primary_key, datt):
+                primary_key = OrderedDict([(primary_key.name, primary_key)])
+
+            elif isinstance(primary_key, str):
+                if primary_key in item_type.__primary_key__:
+                    primary_key = OrderedDict([(primary_key, 
+                                        item_type.__primary_key__[primary_key])])
+
+                elif primary_key in item_type.__value_attrs__:
+                    primary_key = OrderedDict([(primary_key, 
+                                        item_type.__value_attrs__[primary_key])])
+                else:
+                    errmsg = "No '%s' attribute is defined in %s"
+                    errmsg %= (primary_key, item_type.__name__)
+                    raise ValueError(errmsg)
+            
+            elif isinstance(primary_key, Iterable):
+                pkeys = OrderedDict()
+                for attr in primary_key:
+                    if isinstance(attr, datt):
+                        pkeys[attr.name] = attr
+
+                    elif isinstance(attr, str):
+                        if attr in item_type.__primary_key__:
+                            attr = item_type.__primary_key__[attr]
+
+                        elif attr in item_type.__value_attrs__:
+                            attr = item_type.__value_attrs__[attr]
+                        else:
+                            errmsg = "No '%s' attribute is defined in %s"
+                            errmsg %= (attr, item_type.__name__)
+                            raise ValueError(errmsg)
+                        pkeys[attr.name] = attr
+                    else:
+                        raise ValueError('primary_key should be a datt, '
+                                         'str object or a collection of it')
+                primary_key = pkeys
+            
+            else:
+                raise TypeError('primary_key should be a datt object ' 
+                                'or an iterable of datt object')
+            
+            self._primary_key = primary_key
+            self._primary_key_class = namedtuple('PK', (n for n in primary_key))
+
+        else:
+            if not item_type.__primary_key__:
+                errmsg = "primary key should be given in primary_key argument "
+                errmsg += " or be defined in %s class "
+                errmsg %= item_type.__name__
+                raise ValueError(errmsg)
+
+            self._primary_key = item_type.__primary_key__
+            self._primary_key_class = item_type.__primary_key_class__
+
+        
 
         self.__attr_doc  = doc
 
@@ -285,18 +343,21 @@ class dset(daggregate):
             errmsg %= self.item_type.__name__
             raise TypeError(errmsg)
 
-        obj_id = obj.__primary_key__
-        if not obj_id:
+        print(333, self._primary_key)
+        pkey = self._primary_key_class(*tuple(getattr(obj, n) 
+                                        for n in self._primary_key.keys()))
+        # pkey = obj.__primary_key__
+        if not pkey:
             errmsg = "The item's identity of %s is required" 
             errmsg %= obj.__class__.__name__
             raise TypeError(errmsg)
         
-        if obj_id in self.__map:
-            index = self.__map[obj_id]
+        if pkey in self.__map:
+            index = self.__map[pkey]
             self.__list[index] = obj
         else:
             index = len(self.__list)
-            self.__map[obj_id] = index
+            self.__map[pkey] = index
             self.__list.append(obj)
 
     def clear(self):
@@ -468,7 +529,7 @@ class dset(daggregate):
 
     def reform(self, other):
         self.clear()
-        items = (item.copy() for item in self.__list)
+        items = (item.copy() for item in other.__list)
         for item in items:
             self.append(item)
 
@@ -671,11 +732,11 @@ class dobject(metaclass=DObjectMetaClass):
         pkey_attrs   = []
         val_attrs = []
         if onlywith:
-            for attr_name, attr in self.__class__.__primary_key__.items():
-                if attr_name in ignore or attr in ignore:
-                    continue
+            # for attr_name, attr in self.__class__.__primary_key__.items():
+            #     if attr_name in ignore or attr in ignore:
+            #         continue
 
-                pkey_attrs.append(attr)
+            #     pkey_attrs.append(attr)
 
             for attr_name, attr in self.__class__.__value_attrs__.items():
                 if attr_name not in onlywith or attr not in onlywith:
@@ -687,20 +748,19 @@ class dobject(metaclass=DObjectMetaClass):
                 val_attrs.append(attr)
 
         else:
-            for attr_name, attr in self.__class__.__primary_key__.items():
-                if attr_name in ignore or attr in ignore:
-                    continue
+            # for attr_name, attr in self.__class__.__primary_key__.items():
+            #     if attr_name in ignore or attr in ignore:
+            #         continue
 
-                pkey_attrs.append(attr)
+            #     pkey_attrs.append(attr)
 
             for attr_name, attr in self.__class__.__value_attrs__.items():
-                print(123, attr_name, attr)
                 if attr_name in ignore or attr in ignore:
                     continue
 
                 val_attrs.append(attr)
 
-        return pkey_attrs, val_attrs
+        return val_attrs
 
 
     def reform(self, src, onlywith=None, ignore=None, link=None):
@@ -717,10 +777,10 @@ class dobject(metaclass=DObjectMetaClass):
         """
 
 
-        self_pkey_attrs, self_val_attrs = self._attrs_filtered(onlywith, ignore)
+        self_val_attrs = self._attrs_filtered(onlywith, ignore)
 
 
-        # self_values = self.__value_dict__
+        self_values = self.__value_dict__
 
         NO_VALUE = object()
 
@@ -736,15 +796,7 @@ class dobject(metaclass=DObjectMetaClass):
 
 
         if isinstance(src, dict):
-            # for attr_name in self_pkey_attrs:
-            #     self_val  = getattr(self, attr_name)
-            #     other_val = other.get(attr_name, NO_VALUE)
-                
-            #     if self_val is not None:
-            #         # the not-none attribute value of primary key should be keeped
-            #         continue                 
 
-            #     copy_value(attr_name, self_val, other_val)
 
             for attr in self_val_attrs:
                 attr_name = attr.name
@@ -754,22 +806,12 @@ class dobject(metaclass=DObjectMetaClass):
                 copy_value(attr_name, self_val, other_val)
 
         elif isinstance(src, (dobject, NamedDict)): # support domobj and sqlblock
-            # for attr_name in self_pkey_attrs:
-            #     self_val  = getattr(self, attr_name)
-            #     other_val = getattr(src, attr_name, NO_VALUE)
-                
-            #     if self_val is not None:
-            #         # the not-none attribute value of primary key should be keeped
-            #         continue                 
 
-            #     copy_value(attr_name, self_val, other_val)
 
             for attr in self_val_attrs:
                 attr_name = attr.name
                 self_val  = getattr(self, attr_name)
                 other_val = getattr(src,  attr_name, NO_VALUE)
-
-                print(456, attr_name, self_val, other_val)
 
                 copy_value(attr_name, self_val, other_val)
 
