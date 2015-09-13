@@ -17,6 +17,7 @@ from .. import json as _json
 
 from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
+from ..exception import UnauthorizedError, ForbiddenError, BusinessLogicError
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
 
@@ -66,55 +67,90 @@ class BaseFuncRequestHandler(RequestHandler):
         return self.handler_name + '(' + ', '.join(kwargs) + ') at ' + hex(id(self)) 
 
 
-    def write_error(self, status_code, **kwargs):
-        exc_type, exc_val, exc_tb = kwargs['exc_info']
+    def handle_exception(self, exc_info):
+        exc_type, exc_val, exc_tb = exc_info
 
         if isinstance(exc_val, HTTPError):
             status_code = exc_val.status_code
             reason = exc_val.reason if hasattr(exc_val, 'reason') else None
             message = exc_val.log_message
+        elif isinstance(exc_val, UnauthorizedError):
+            status_code = 401
+            reason = 'Unauthorized'
+            message = str(exc_val)
+        elif isinstance(exc_val, ForbiddenError):
+            status_code = 403
+            reason = 'Forbidden'
+            message = str(exc_val)
+        elif isinstance(exc_val, BusinessLogicError):
+            status_code = 409
+            reason = 'Conflict(Business Logic)'
+            message = str(exc_val)      
         else:
             status_code = 500
-            reason='Server Exception'
+            reason='Internal Server Error'
             message = str(exc_val)
-            print(messagee)
         
         tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
-        path = self.request.path
-        errmsg = [
-            '%d ERROR(%s): %s' % (status_code, exc_type.__name__, message),
-            'This request (%s) was handled by %s' % (path, self.handler_name)
-        ]
-        self.logger.error('. '.join(errmsg), exc_info=kwargs['exc_info'])
 
+        errmsg = '%s[%d, %s]: %s' 
+        errmsg %= (exc_type.__name__, status_code, self.request.path, message)
+        self.logger.error(errmsg, exc_info=exc_info)
+        
+        return status_code, reason, message, tb_list        
+
+    def write_error(self, status_code, **kwargs):
+        exc_info = kwargs['exc_info']
+        status_code, reason, message, tb_list = self.handle_exception(exc_info)
+
+        errmsg = 'ERROR %d: %s\nCaught an exception %s\n' 
+        errmsg %= (status_code, message, exc_type.__name__)
         for tb in tb_list:
-            errmsg.append('    at %s, code: %s' % (tb['at'], tb['code']))
-        errmsg = '\n'.join(errmsg)
+            errmsg += '    at %s, code: %s\n' % (tb['at'], tb['code'])
 
         self.set_status(status_code, reason=reason)
-        self.set_header('Content-Type', 'text/plain;charset=UTF-8')
+        self.set_header('Content-Type', 'text/plain; charset=UTF-8')
         self.write(errmsg)
 
     def do_handler_func(self, *args, **kwargs) :
 
-        nodefault_params = set()
+        arguments = OrderedDict()
         for param in inspect.signature(self.handler_func).parameters.values():
-            if param.default is param.empty:
-                nodefault_params.add(param.name)        
+            if param.default is param.empty :
+                arguments[param.name] = None
+            else:
+                arguments[param.name] = param.default
+        
 
-        pargs = self.req_path_args
-        qargs = self.req_query_args
-        for arg in kwargs:
-            if arg in pargs and pargs[arg] != str:
-                kwargs[arg] = pargs[arg](kwargs[arg])
-            elif arg in qargs:                
-                kwargs[arg] = self.get_argument(n, None)
 
-        for param in nodefault_params: # the param is not assigned
-            if param not in kwargs:
-                kwargs[param] = None
+        for arg_name, arg_type in self.req_query_args.items():
+            if arg_name in arguments:
+                arg_val = self.get_argument(arg_name, None)
+                if arg_type != str and arg_val is not None:
+                    arg_val = arg_type(arg_val)
+                
+                arguments[arg_name] = arg_val
 
-        self._handler_args = kwargs
+        # get argument value from path arguments
+        for arg_name, arg_type in self.req_path_args.items():
+            if arg_name in arguments:
+                arg_val = kwargs[arg_name]
+                if arg_type != str and arg_val is not None:
+                    arg_val = arg_type(arg_val)
+                
+                arguments[arg_name] = arg_val
+
+        # get json argument from body of http message
+        if 'json_arg' in arguments:
+            body_data = self.request.body
+            if body_data : # if no body data, here is empty byte data
+                arguments['json_arg'] = _json.loads(body_data.decode('UTF-8'))
+            else:
+                arguments['json_arg'] = None
+
+
+        # ------------------------------------------------------------------------
+        self._handler_args = arguments
         
         def exit_callback(exc_type, exc_val, tb):
             self._handler_args = None
@@ -127,24 +163,15 @@ class BaseFuncRequestHandler(RequestHandler):
                                            (_busilogic_pillar, busilogic_layer)], 
                                            exit_callback)
         
-        return bound_func(*args, **kwargs)
+        return bound_func(**arguments)
 
 
 class RESTFuncRequestHandler(BaseFuncRequestHandler):
 
 
     def do_handler_func(self, *args, **kwargs):
-
-        if 'json_arg' in kwargs:
-            body_data = self.request.body
-            if body_data : # if no body data, here is empty byte data
-                kwargs['json_arg'] = _json.loads(body_data.decode('UTF-8'))
-            else:
-                kwargs['json_arg'] = None
-
         obj = super(RESTFuncRequestHandler, self).do_handler_func(*args, **kwargs)
 
-        # obj = func(*args, **kwargs)
         if not isinstance(obj, (list, tuple, dset)):
             obj = [obj]
 
@@ -153,35 +180,18 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
 
 
     def write_error(self, status_code, **kwargs):
-        exc_type, exc_val, exc_tb = kwargs['exc_info']
+        exc_info = kwargs['exc_info']
+        status_code, reason, message, tb_list = self.handle_exception(exc_info)
 
-        if isinstance(exc_val, HTTPError):
-            status_code = exc_val.status_code
-            reason = exc_val.reason if hasattr(exc_val, 'reason') else None
-            message = exc_val.log_message
-        else:
-            status_code = 500
-            reason='Server Exception'
-            message = str(exc_val)
-
-
-        tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
-
-        errmsg = '%s[%d, %s]: %s' 
-        errmsg %= (exc_type.__name__, status_code, self.request.path, message)
-        self.logger.error(errmsg, exc_info=kwargs['exc_info'])
-
-        errobj = OrderedDict([
-                ('status_code', status_code),
-                ('error', message),
-                ('type', exc_type.__name__),
-                ('path', self.request.path),
-                ('handler', self.handler_name),
-                ('traceback', tb_list)
-            ])
-
+        errobj = OrderedDict(
+                    status_code=status_code,
+                    message=message,
+                    exception=exc_info[0].__name__,
+                    path=self.request.path,
+                    handler=self.handler_name,
+                    traceback=tb_list)
+            
         self.set_status(status_code, reason=reason)
-        self.set_header('Content-Type', 'application/json')
+        self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps([errobj]))
-
 
