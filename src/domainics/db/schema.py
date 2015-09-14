@@ -8,7 +8,7 @@ from collections.abc import Iterable
 # from .. import json
 from ..db.sqlblock import transaction, dbc
 from ..util     import iter_submodules
-from ..domobj   import DObjectMetaClass, dobject, datt, dset
+from ..domobj   import dobject, datt, dset
 
 import textwrap
 

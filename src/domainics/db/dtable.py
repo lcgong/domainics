@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from ..domobj import DObjectMetaClass, dobject, datt, dset
+from ..domobj import dobject, datt, dset
 
 
 class dtable(dobject):
