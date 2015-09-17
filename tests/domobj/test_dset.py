@@ -28,13 +28,13 @@ def test_dset_primary_key():
         a = datt(int)
         b = datt(int)
         c = datt(int)
-        
+
         __primary_key__ = [a]
 
 
     a_list = [A(a=1, b=1, c=2), A(a=1, b=2, c=3)]
     s = dset(A)
-    # Because the primary_key is 'a' attribute, the two above instances 
+    # Because the primary_key is 'a' attribute, the two above instances
     # have the same value in this dset, their are regarded to be the one.
     # Thus the later instance will overwrite the previous
 
@@ -59,9 +59,3 @@ def test_dset_primary_key():
     s += a_list
     assert len(s) == 2
     assert s[0].c == 2 and s[1].c == 3
-
-
-    
-
-
-
