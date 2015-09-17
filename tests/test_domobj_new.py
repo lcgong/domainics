@@ -13,53 +13,53 @@ def setup_module(module):
     print()
 
 
-def test_reform():
+# def test_reform():
+#
+#     class I(dobject):
+#         s = datt(int)
+#         z = datt(int)
+#
+#         __primary_key__ = s
+#
+#     class A(dobject):
+#         a = datt(int)
+#         b = datt(int)
+#         c = datt(int)
+#         d = datt(int)
+#
+#         l = dset(item_type=I)
+#
+#         x = datt(int)
+#
+#         __primary_key__ = [a, b]
+#
+#     class B(dobject):
+#         a = datt(int)
+#         b = datt(int)
+#         c = datt(int)
+#         d = datt(int)
+#
+#         y = datt(int)
+#
+#         l = dset(item_type=I)
+#
+#         __primary_key__ = [a, b]
+#
+#
+#     a = A(a=1, b=2, c=3, d=4, x=8)
+#     a.l = dset(I, [I(1, 101), I(2, 102)])
+#
+#
+#     b = A(a=13, c=13)
+#     print(a)
+#     print(b)
+#
+#     b.reform(a)
+#     print(b)
+#
 
-    class I(dobject):
-        s = datt(int)
-        z = datt(int)
 
-        __primary_key__ = s
-
-    class A(dobject):
-        a = datt(int)
-        b = datt(int)
-        c = datt(int)
-        d = datt(int)
-
-        l = dset(item_type=I)
-
-        x = datt(int)
-
-        __primary_key__ = [a, b]
-
-    class B(dobject):
-        a = datt(int)
-        b = datt(int)
-        c = datt(int)
-        d = datt(int)
-
-        y = datt(int)
-
-        l = dset(item_type=I)
-
-        __primary_key__ = [a, b]
-
-
-    a = A(a=1, b=2, c=3, d=4, x=8)
-    a.l = dset(I, [I(1, 101), I(2, 102)])
-
-
-    b = A(a=13, c=13)
-    print(a)
-    print(b)
-
-    b.reform(a)
-    print(b)
-
-
-
-@pytest.mark.skipif(True)
+# @pytest.mark.skipif(True)
 def test_new():
 
     class A(dobject):

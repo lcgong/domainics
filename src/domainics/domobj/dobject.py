@@ -12,89 +12,24 @@ from collections.abc import Iterable, Mapping
 
 from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr
 
-"""
-A(reform(dobj, a, b, ignore=[c]), k=1)
-
-"""
-
-
-class Transformation:
-    __slot__ = ('source', 'requred', 'ignored')
-
-    def __init__(self, source):
-        self.source = source
-        self.required = OrderedDict()
-        self.ignored = OrderedDict()
-
-
-def transform(source, *args, **kwargs):
-    """Reforme the source dobject object.
-
-    Attributes required
-    reform(source_object, 'attr_name1', attr2, attr3=True)
-
-    Attributes ignored:
-    reform(source_object, ignored_attr1=False, ignored_attr2=False)
-    reform(source_object, ignore=('ignored_attr1', ignored_attr2))
-    """
-    definition = Transformation(source)
-
-    for i, arg in enumerate(args):
-        if isinstance(arg, str):
-            definition.required[arg] = True
-        elif isinstance(arg, datt):
-            definition.required[arg.name] = True
-        else:
-            errmsg = "The %dth argument should be a str or datt object: %r"
-            errmsg %= (i + 1, arg)
-            raise ValueError(errmsg)
-
-    for arg, arg_value in kwargs.items():
-        if arg == 'ignore' and isinstance(arg_value, Iterable):
-            for i, elem in enumerate(arg_value):  # ignore=(attr1, 'attr2')
-                if isinstance(elem, str):
-                    definition.ignored[elem] = True
-                elif isinstance(elem, datt):
-                    definition.ignored[elem.name] = True
-                else:
-                    errmsg = ("The %d-th element in 'ignore' argument "
-                              "should be a str or datt object: %r")
-                    errmsg %= (elem, arg_value)
-                    raise ValueError(errmsg)
-        elif arg == 'ignore' and isinstance(arg_value, datt):
-            definition.ignored[arg_value.name] = True
-
-        elif isinstance(arg_value, bool):
-            if arg_value:
-                definition.required[arg] = True
-            else:
-                definition.ignored[arg] = True
-
-        else:
-            errmsg = ("The keyword argument(%s) should be "
-                      "True or False, not: %r")
-            errmsg %= (arg, arg_value)
-            raise ValueError(errmsg)
-
-    return definition
-
+from .reshape import ReshapeOperator, reshape
 
 class dobject(metaclass=DObjectMetaClass):
 
-    def _make_transformation(self, trans):
+    def _reshape(self, statement):
         """"""
         this_class = self.__class__
 
         selected_attrs = OrderedDict()
-        if trans.required:
+        if statement.required:
             for attr_name, attr in iter_chain(
                                         this_class.__primary_key__,items(),
                                         this_class.__value_attrs__.items()):
 
-                if attr_name not in trans.requred:
+                if attr_name not in statement.requred:
                     continue
 
-                if attr_name in trans.ignore:
+                if attr_name in statement.ignore:
                     continue
                 selected_attrs[attr_name] = attr
 
@@ -103,20 +38,21 @@ class dobject(metaclass=DObjectMetaClass):
                                         this_class.__primary_key__.items(),
                                         this_class.__value_attrs__.items()):
 
-                if attr_name not in trans.ignored:
+                if attr_name not in statement.ignored:
                     selected_attrs[attr_name] = attr
 
 
-        if isinstance(trans.source, dobject):
+        if isinstance(statement.source, dobject):
             for attr_name, attr in selected_attrs.items():
-                if hasattr(trans.source, attr_name):
-                    attr_val = getattr(trans.source, attr_name)
+                if hasattr(statement.source, attr_name):
+                    attr_val = getattr(statement.source, attr_name)
                     attr.set_value_unguardedly(self, attr_val)
 
-        elif isinstance(trans.source, Mapping):
+        elif isinstance(statement.source, Mapping):
             for attr_name, attr in selected_attrs.items():
-                if attr_name in trans.source:
-                    attr.set_value_unguardedly(self, trans.source[attr_name])
+                if attr_name in statement.source:
+                    attr.set_value_unguardedly(self,
+                                                statement.source[attr_name])
 
 
     def __new__(cls, *values, **kwvalues):
@@ -132,12 +68,11 @@ class dobject(metaclass=DObjectMetaClass):
         if not values and not kwvalues:  # empty object
             return instance
 
-        if values and isinstance(values[0], Transformation):
-            instance._make_transformation(values.pop()) # consume the argument
+        if values and isinstance(values[0], ReshapeOperator):
+            instance._reshape(values.pop()) # consume the argument
 
         parameters = OrderedDict(iter_chain(cls.__primary_key__.items(),
                                             cls.__value_attrs__.items()))
-        print(parameters)
 
         seen = set()
         # consume parameters with the positional arguments
@@ -197,10 +132,9 @@ class dobject(metaclass=DObjectMetaClass):
         """ """
         values =  self.__value_dict__
 
-        segs = [repr(self.__primary_key__)]
+        segs = [repr(self.__primary_key__)] if self.__primary_key__ else []
         segs += ['%s=%r' % (attr_name, values.get(attr_name))
                     for attr_name in self.__class__.__value_attrs__]
-
 
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
@@ -280,112 +214,112 @@ class dobject(metaclass=DObjectMetaClass):
 
         return self
 
-    def _attrs_filtered(self, onlywith=None, ignore=None):
+    # def _attrs_filtered(self, onlywith=None, ignore=None):
+    #
+    #     if not isinstance(onlywith, Iterable):
+    #         if onlywith is None:
+    #             onlywith = set()
+    #         elif isinstance(onlywith, (datt, str)):
+    #             onlywith = set([onlywith])
+    #         else:
+    #             raise ValueError("The argument 'onlywith' "
+    #                              "should be a datt or str object")
+    #     else:
+    #         onlywith = set(onlywith)
+    #
+    #     if not isinstance(ignore, Iterable):
+    #         if ignore is None:
+    #             ignore = set()
+    #         elif isinstance(ignore, (datt, str)):
+    #             ignore = set([ignore])
+    #         else:
+    #             raise ValueError("The argument 'ignore' "
+    #                              "should be a datt or str object")
+    #     else:
+    #         ignore = set(ignore)
+    #
+    #     pkey_attrs = []
+    #     val_attrs = []
+    #     if onlywith:
+    #         for attr_name, attr in self.__class__.__primary_key__.items():
+    #             if attr_name in ignore or attr in ignore:
+    #                 continue
+    #
+    #             pkey_attrs.append(attr)
+    #
+    #         for attr_name, attr in self.__class__.__value_attrs__.items():
+    #             if attr_name not in onlywith or attr not in onlywith:
+    #                 continue
+    #
+    #             if attr_name in ignore or attr in ignore:
+    #                 continue
+    #
+    #             val_attrs.append(attr)
+    #
+    #     else:
+    #         for attr_name, attr in self.__class__.__primary_key__.items():
+    #             if attr_name in ignore or attr in ignore:
+    #                 continue
+    #
+    #             pkey_attrs.append(attr)
+    #
+    #         for attr_name, attr in self.__class__.__value_attrs__.items():
+    #             if attr_name in ignore or attr in ignore:
+    #                 continue
+    #
+    #             val_attrs.append(attr)
+    #
+    #     return val_attrs
 
-        if not isinstance(onlywith, Iterable):
-            if onlywith is None:
-                onlywith = set()
-            elif isinstance(onlywith, (datt, str)):
-                onlywith = set([onlywith])
-            else:
-                raise ValueError("The argument 'onlywith' "
-                                 "should be a datt or str object")
-        else:
-            onlywith = set(onlywith)
-
-        if not isinstance(ignore, Iterable):
-            if ignore is None:
-                ignore = set()
-            elif isinstance(ignore, (datt, str)):
-                ignore = set([ignore])
-            else:
-                raise ValueError("The argument 'ignore' "
-                                 "should be a datt or str object")
-        else:
-            ignore = set(ignore)
-
-        pkey_attrs = []
-        val_attrs = []
-        if onlywith:
-            for attr_name, attr in self.__class__.__primary_key__.items():
-                if attr_name in ignore or attr in ignore:
-                    continue
-
-                pkey_attrs.append(attr)
-
-            for attr_name, attr in self.__class__.__value_attrs__.items():
-                if attr_name not in onlywith or attr not in onlywith:
-                    continue
-
-                if attr_name in ignore or attr in ignore:
-                    continue
-
-                val_attrs.append(attr)
-
-        else:
-            for attr_name, attr in self.__class__.__primary_key__.items():
-                if attr_name in ignore or attr in ignore:
-                    continue
-
-                pkey_attrs.append(attr)
-
-            for attr_name, attr in self.__class__.__value_attrs__.items():
-                if attr_name in ignore or attr in ignore:
-                    continue
-
-                val_attrs.append(attr)
-
-        return val_attrs
-
-    def reform(self, other, onlywith=None, ignore=None, link=None):
-        """
-        Reform the dobject with src's attribues or fields.
-
-        A reformation of object means that the object is still the object
-        itself. After reformation, primary key attributes are pristine.
-
-        The link is a dictionary defined with the connections between this
-        attribute to some attribue of the other's.
-
-        Note: the onlywith does not applied on primary key attributes.
-        """
-
-        self_val_attrs = self._attrs_filtered(onlywith, ignore)
-
-        NO_VALUE = object()
-
-        def copy_value(attr_name, self_val, other_val):
-            if other_val is NO_VALUE:
-                return
-
-            if (isinstance(self_val, daggregate) or
-                    isinstance(self_val, dobject)):
-
-                self_val.reform(other_val)
-                return
-
-            setattr(self, attr_name, other_val)
-
-        if isinstance(other, dict):
-
-            for attr in self_val_attrs:
-                attr_name = attr.name
-                self_val = getattr(self, attr_name)
-                other_val = other.get(attr_name, NO_VALUE)
-
-                copy_value(attr_name, self_val, other_val)
-
-        elif isinstance(other, (dobject, NamedDict)):
-            # support domobj and sqlblock
-
-            for attr in self_val_attrs:
-                attr_name = attr.name
-                self_val = getattr(self, attr_name)
-                other_val = getattr(other,  attr_name, NO_VALUE)
-
-                copy_value(attr_name, self_val, other_val)
-
-        else:
-            raise TypeError('Unknown type: ' + other.__class__.__name__)
-
-        return self
+    # def reform(self, other, onlywith=None, ignore=None, link=None):
+    #     """
+    #     Reform the dobject with src's attribues or fields.
+    #
+    #     A reformation of object means that the object is still the object
+    #     itself. After reformation, primary key attributes are pristine.
+    #
+    #     The link is a dictionary defined with the connections between this
+    #     attribute to some attribue of the other's.
+    #
+    #     Note: the onlywith does not applied on primary key attributes.
+    #     """
+    #
+    #     self_val_attrs = self._attrs_filtered(onlywith, ignore)
+    #
+    #     NO_VALUE = object()
+    #
+    #     def copy_value(attr_name, self_val, other_val):
+    #         if other_val is NO_VALUE:
+    #             return
+    #
+    #         if (isinstance(self_val, daggregate) or
+    #                 isinstance(self_val, dobject)):
+    #
+    #             self_val.reform(other_val)
+    #             return
+    #
+    #         setattr(self, attr_name, other_val)
+    #
+    #     if isinstance(other, dict):
+    #
+    #         for attr in self_val_attrs:
+    #             attr_name = attr.name
+    #             self_val = getattr(self, attr_name)
+    #             other_val = other.get(attr_name, NO_VALUE)
+    #
+    #             copy_value(attr_name, self_val, other_val)
+    #
+    #     elif isinstance(other, (dobject, NamedDict)):
+    #         # support domobj and sqlblock
+    #
+    #         for attr in self_val_attrs:
+    #             attr_name = attr.name
+    #             self_val = getattr(self, attr_name)
+    #             other_val = getattr(other,  attr_name, NO_VALUE)
+    #
+    #             copy_value(attr_name, self_val, other_val)
+    #
+    #     else:
+    #         raise TypeError('Unknown type: ' + other.__class__.__name__)
+    #
+    #     return self

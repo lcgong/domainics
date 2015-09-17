@@ -33,6 +33,7 @@ by forbidding external objects from holding references to its members.
 """
 
 
-from .dobject import dobject, transform
+from .dobject import dobject
+from .reshape import reshape
 from .dset import dset
 from .metaclass import datt, daggregate

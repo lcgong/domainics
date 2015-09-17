@@ -3,11 +3,12 @@
 from collections import OrderedDict
 from collections import namedtuple
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 
 from .metaclass import datt, daggregate
 from .dobject import dobject
+from .reshape import reshape
 
 
 class dset(daggregate):
@@ -70,7 +71,6 @@ class dset(daggregate):
                 raise TypeError('primary_key should be a datt object '
                                 'or an iterable of datt object')
 
-            print(333, primary_key)
             self._item_primary_key = primary_key
             self._item_primary_key_class = namedtuple('PK', (n for n in primary_key))
 
@@ -103,8 +103,12 @@ class dset(daggregate):
         """
         If the identity of obj has been added, replace the old one with it.
         """
-        if not isinstance(obj, self.item_type):
-            errmsg = "The aggregate object should be '%s' type"
+        if isinstance(obj, self.item_type):
+            pass
+        elif isinstance(obj, Mapping):
+            obj = self.item_type(reshape(obj)) # reshape the dict object
+        else:
+            errmsg = "The aggregate object should be %s or mapping object"
             errmsg %= self.item_type.__name__
             raise TypeError(errmsg)
 
@@ -133,20 +137,32 @@ class dset(daggregate):
     def index(self, obj):
         """The index of the object in this aggregate"""
 
-        if isinstance(obj, tuple):
-            dobj_id = obj
-        elif isinstance(obj, int):
-            pass
+        if isinstance(obj, int):
+            raise ValueError('TBD:')
+        elif isinstance(obj, tuple):
+            pkey_obj = self._item_primary_key_class(*obj)
+        elif isinstance(obj, dict):
+            pkey_obj = self._item_primary_key_class(**obj)
         elif isinstance(obj, dobject):
-            dobj_id = obj._dobj_id
+            if (self._item_primary_key_class !=
+                    obj.__class__.__primary_key_class__):
+                pkey_obj = self._item_primary_key_class(
+                    *(getattr(obj, attr_name)
+                        for attr_name in self._item_primary_key))
+            else:
+                pkey_obj = obj.__primary_key__
+
         else:
             errmsg = 'The type of object should be dobject, identity or int: %s'
             errmsg %= obj.__class__.__name__
             raise TypeError(errmsg)
 
-        index = self.__map.get(dobj_id)
+        index = self.__map.get(pkey_obj)
         if index is None:
-            raise ValueError ('no value of the identity %r' % dobj_id)
+            errmsg = 'no value found by the primary key:  %r <- %r'
+            errmsg %= (pkey_obj, obj)
+            raise ValueError (errmsg)
+
         return index
 
     def copy(self):
@@ -294,8 +310,8 @@ class dset(daggregate):
         return self
         # operator 'o.x += a', translate into o.x = o.x.__iadd__(a)
 
-    def reform(self, other):
-        self.clear()
-        items = (item.copy() for item in other.__list)
-        for item in items:
-            self.append(item)
+    # def reform(self, other):
+    #     self.clear()
+    #     items = (item.copy() for item in other.__list)
+    #     for item in items:
+    #         self.append(item)
