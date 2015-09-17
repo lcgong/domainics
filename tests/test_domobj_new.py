@@ -14,7 +14,7 @@ def setup_module(module):
 
 
 def test_reform():
-    
+
     class I(dobject):
         s = datt(int)
         z = datt(int)
@@ -30,7 +30,7 @@ def test_reform():
         l = dset(item_type=I)
 
         x = datt(int)
-        
+
         __primary_key__ = [a, b]
 
     class B(dobject):
@@ -38,7 +38,7 @@ def test_reform():
         b = datt(int)
         c = datt(int)
         d = datt(int)
-        
+
         y = datt(int)
 
         l = dset(item_type=I)
@@ -49,7 +49,7 @@ def test_reform():
     a = A(a=1, b=2, c=3, d=4, x=8)
     a.l = dset(I, [I(1, 101), I(2, 102)])
 
-    
+
     b = A(a=13, c=13)
     print(a)
     print(b)

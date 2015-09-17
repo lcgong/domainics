@@ -17,13 +17,13 @@ from collections.abc import Iterable
 #         self.__value_dict__ = value_dict
 
 #     def __repr__(self):
-#         expr = ','.join(['%s=%r' % (attr_name, getattr(self, attr_name)) 
+#         expr = ','.join(['%s=%r' % (attr_name, getattr(self, attr_name))
 #                          for attr_name in primary_key])
 
 #         return self.__class__.__name__ + '(' + expr + ')'
 
 #     def __tuple__(self):
-#         return tuple(getattr(self, attr_name) 
+#         return tuple(getattr(self, attr_name)
 #                         for attr_name in primary_key)
 
 #     def __eq__(self, other):
@@ -47,7 +47,7 @@ from collections.abc import Iterable
 
 #     class_code = _primary_key_class_tmpl + '\n' + properties
 #     namespace  = dict(primary_key=pkey_attrs)
-    
+
 #     exec(class_code, namespace)
 #     cls = namespace['PK']
 
@@ -65,7 +65,7 @@ class datt:
         self.default      = default
         self.doc          = doc
         # why not to define primary key in attribute
-        # Such as, a pkey attribute is defined in parent, but not defined in child 
+        # Such as, a pkey attribute is defined in parent, but not defined in child
 
 
 
@@ -73,14 +73,31 @@ class datt:
         if instance is None: # get domain field
             return self
 
+        attr_value = instance.__value_dict__.get(self.name, None)
 
-        return getattr(instance, '__value_dict__').get(self.name)
+        if attr_value is None and self.default is not None:
+            # set default value
+            if isinstance(self.default, type):
+                attr_value = self.default()
+            elif isinstance(self.default, (str, int, float, Decimal,
+                                           dt.date, dt.time, dt.datetime,
+                                           dt.timedelta)):
+                attr_value = self.default
+            else:
+                errmsg = "Unknown the default value: %r" % self.default
+                raise ValueError(errmsg)
+
+            self.set_value_unguardedly(instance, attr_value)
+
+        return attr_value
 
     def __set__(self, instance, value):
         if self.name in instance.__class__.__primary_key__:
-            raise ValueError("The primary key attribute '%s' is read-only" % name)
+            errmsg = "The primary key attribute '%s' is read-only"
+            errmsg %= self.name
+            raise ValueError(errmsg)
 
-        self._unguarded_set_value(instance, value)
+        self.set_value_unguardedly(instance, value)
 
     def set_value_unguardedly(self, instance, value):
 
@@ -88,8 +105,8 @@ class datt:
         if hasattr(self.type, '__setter_filter__'):
             value = self.type.__setter_filter__(value)
         else:
-            value = cast_attr_value(self.name, value, self.type)  
-        
+            value = cast_attr_value(self.name, value, self.type)
+
         attr_values[self.name] = value
 
 
@@ -99,39 +116,46 @@ class daggregate:
 class AggregateAttr:
     """The aggregate attribute of domain object"""
 
-    __slots__ = ('name', 'agg_type', 'item_type', 'is_identity', 'doc')
+    __slots__ = ('name', 'agg_type', 'item_type', 'is_identity', 'doc',
+                    '_item_primary_key', '_item_primary_key_class')
 
-    def __init__(self, agg_type, item_type, doc=None):
-        self.agg_type     = agg_type
-        self.item_type    = item_type
-        self.is_identity  = False
-        self.doc          = doc
+    def __init__(self, agg_type, item_type, doc=None,
+                    primary_key=None, primary_key_class=None):
+
+        self.agg_type = agg_type
+        self.item_type = item_type
+        self.is_identity = False
+        self.doc = doc
+        self._item_primary_key = primary_key
+        self._item_primary_key_class = primary_key_class
 
     def __get__(self, instance, owner):
-        if instance is None: # get domain attribute
+        if instance is None: # get attribute
             return self
 
-        val = getattr(instance, '__value_dict__').get(self.name)
-        return val
+        # get value of attribute
+        value = instance.__value_dict__.get(self.name, None)
+        if value is None:
+            value = self.agg_type(item_type=self.item_type,
+                                  primary_key=self._item_primary_key)
+            instance.__value_dict__[self.name] = value
 
-    def __set__(self, instance, value):
-        oldval = getattr(instance, '__value_dict__').get(self.name)
+        return value
 
-        if oldval is value:
-            # operator 'o.x += a', it is translated into o.x = o.x.__iadd__(a)
-            return
+    def set_value_unguardedly(self, instance, value):
 
-        if not isinstance(value, self.agg_type):
-            errmsg = "The aggregate object %s should be %s type, instead of %s"
-            errmsg %= (self.name, 
-                       self.agg_type.__name__, 
-                       value.__class__.__name__)
+        dset_value = getattr(instance, self.name)
+        if not isinstance(value, Iterable):
+            errmsg = ("The assigned object (%s) to aggregate attribute "
+                      "'%s' is not iterable")
+            errmsg %= (value.__class__.__name__, self.name)
             raise TypeError(errmsg)
-        
-        
-        oldval.clear()
+
+        dset_value.clear()
         for r in value:
-            oldval.append(r)
+            dset_value.add(r)
+
+    __set__ = set_value_unguardedly
 
 
 class DObjectMetaClass(type):
@@ -146,7 +170,7 @@ class DObjectMetaClass(type):
     """
 
     @classmethod
-    def __prepare__(metacls, name, bases, **kwargs): 
+    def __prepare__(metacls, name, bases, **kwargs):
         return OrderedDict()
 
     def __new__(metacls, classname, bases, class_dict):
@@ -161,20 +185,22 @@ class DObjectMetaClass(type):
             attrs = getattr(base_cls, '__value_attrs__')
             if attrs is not None:
                 value_attrs.update(attrs)
-        
+
         primary_key = class_dict.pop('__primary_key__', None)
 
         attributes = []
         for attr_name, descriptor in class_dict.items():
-            
+
             if isinstance(descriptor, datt):
                 pass
             elif isinstance(descriptor, daggregate):
-                # In class-block, dset or daggregate object is used, 
+                # In class-block, dset or daggregate object is used,
                 # replace it with AggregateAttr
-                descriptor = AggregateAttr(descriptor.__class__, 
-                                           descriptor.item_type, 
-                                           descriptor.__doc__)
+                descriptor = AggregateAttr(descriptor.__class__,
+                                           descriptor.item_type,
+                                           descriptor.__doc__,
+                                           descriptor._item_primary_key,
+                                           descriptor._item_primary_key_class)
 
                 class_dict[attr_name] = descriptor
             else:
@@ -192,13 +218,18 @@ class DObjectMetaClass(type):
                 for attr in primary_key:
                     pkey_names.add(attr.name)
             else:
-                raise TypeError('__primary_key__ should be a datt object ' 
+                raise TypeError('__primary_key__ should be a datt object '
                                 'or an iterable of datt object')
-        
+
         if pkey_names:
             # If available, the primary key declaration overrides parent's
-            pkey_attrs.clear()  # clear base class's primary key
-        
+            for attr_name in tuple(reversed(pkey_attrs.keys())):
+                if attr_name not in pkey_names:
+                    # the pk attribute of child is not primary key
+                    attr = pkey_names.pop(attr_name)
+                    value_attrs[attr_name] = attr
+                    value_attrs.move_to_end(attr_name, last=Fasle)
+
         for attr in attributes:
             if attr.name in pkey_names:
                 pkey_attrs[attr.name] = attr
@@ -209,7 +240,7 @@ class DObjectMetaClass(type):
         cls = type.__new__(metacls, classname, bases, class_dict)
 
 
-        
+
         setattr(cls, '__primary_key_class__', namedtuple('PK', pkey_attrs.keys()))
         setattr(cls, '__primary_key__', pkey_attrs)
         setattr(cls, '__value_attrs__', value_attrs)
@@ -229,6 +260,4 @@ def cast_attr_value(attrname, val, attr_type):
     except (ValueError, TypeError) as ex:
         err = "The attribute '%s' should be \'%s\' type, not '%s'"
         err %= (attrname, attr_type.__name__, type(val).__name__)
-        raise TypeError(err).with_traceback(ex.__traceback__)           
-
-
+        raise TypeError(err).with_traceback(ex.__traceback__)
