@@ -39,7 +39,7 @@ def route_base(rule_base, method=None, qargs=None):
     # if proto is not None:
     #     proto = proto.upper()
     #     assert proto.upper() in ('REST'), 'not supported protocols: ' + proto
-    #     routes.default_proto = proto     
+    #     routes.default_proto = proto
 
 def rest_route(rule, method=None, qargs=None):
     """
@@ -48,7 +48,7 @@ def rest_route(rule, method=None, qargs=None):
     def route_decorator(func):
         route_table = _get_route_table(func)
         route_table.set_rule(rule, qargs, method, func, None, 'REST')
-        
+
         return func
 
     return route_decorator
@@ -61,7 +61,7 @@ def http_route(rule, method=None, qargs=None):
     def route_decorator(func):
         route_table = _get_route_table(func)
         route_table.set_rule(rule, qargs, method, func, None, 'HTTP')
-        
+
         return func
 
     return route_decorator
@@ -77,10 +77,10 @@ class ModuleRouteTable:
 
     def set_rule(self, rule, qargs, method, handler_func, params=None, proto=None):
         if rule in self.handlers:
-            errmsg = 'The rule %s has already set in %s ' 
+            errmsg = 'The rule %s has already set in %s '
             errmsg %= (rule, route_table.module.__name__)
             raise NameError(errmsg)
-        self.handlers[rule] = RouteSpec(rule, qargs, method, proto, 
+        self.handlers[rule] = RouteSpec(rule, qargs, method, proto,
                                         handler_func, params)
 
     def handler_specs(self):
@@ -97,17 +97,17 @@ class ModuleRouteTable:
             methods = comma_split(spec.method if spec.method else self.method)
             proto   = spec.proto if spec.proto else self.proto
 
-            handler_cls = _make_handler_class(spec.handler, 
-                                              spec.proto, 
-                                              methods, 
-                                              pargs, 
+            handler_cls = _make_handler_class(spec.handler,
+                                              spec.proto,
+                                              methods,
+                                              pargs,
                                               qargs)
 
             yield route_rule, pattern, handler_cls, spec.params
 
 
 
-RouteSpec = namedtuple('RouteSpec', 
+RouteSpec = namedtuple('RouteSpec',
     ['rule', 'qargs', 'method', 'proto', 'handler', 'params'])
 
 def _cast_arg_list(arg, filter=None):
@@ -128,11 +128,11 @@ def _cast_arg_list(arg, filter=None):
     if filter is not None:
         return tuple(filter(s) for s in args)
 
-    return tuple(args)    
+    return tuple(args)
 
 
 def _get_route_table(obj):
-    handler_module = inspect.getmodule(obj) 
+    handler_module = inspect.getmodule(obj)
     if not hasattr(handler_module, '_module_route_table'):
         route_table = ModuleRouteTable(handler_module)
         setattr(handler_module, '_module_route_table', route_table)
@@ -194,7 +194,7 @@ def _parse_tokens(rule):
                 name, filtr, conf = g[3:6]
         else:
             name, filtr, conf = g[1], 'str', None
-         
+
         yield name, filtr, conf or None, (match.start(), match.end())
         offset, prefix = match.end(), ''
 
@@ -208,13 +208,13 @@ def _parse_route_rule(rule):
     nonames   = []
     for argname, mode, conf, seg in _parse_tokens(rule):
         if mode:
-            if mode in _route_rule_filters: 
+            if mode in _route_rule_filters:
                 mask, in_filter, out_filter = _route_rule_filters[mode](conf)
             else:
                 mask = mode # default is regex expression
                 out_filter = str
 
-            
+
             if not argname:
                 nonames.append(seg)
 
@@ -229,7 +229,7 @@ def _parse_route_rule(rule):
     # if nonames:
     #     errmsg = "These arguments should be named regex: "
     #     errmsg += ', '.join([
-    #         '[%d:%d](%s)' % (seg[0], seg[1], rule[seg[0]:seg[1]]) 
+    #         '[%d:%d](%s)' % (seg[0], seg[1], rule[seg[0]:seg[1]])
     #         for seg in nonames])
     #     raise ValueError(errmsg)
 
@@ -237,17 +237,17 @@ def _parse_route_rule(rule):
 
 
 def _make_handler_class(func, proto, methods, pargs, qargs):
-    
+
     attrs = dict(
         # func is function that has no 'self' parameter
-        handler_func    = staticmethod(func), 
+        handler_func    = staticmethod(func),
         handler_name    = func.__module__ + '.' + func.__name__,
         req_path_args   = pargs,
         req_query_args  = qargs
         )
-    
 
-    
+
+
     if proto == 'REST':
         base_class = RESTFuncRequestHandler
     elif proto == 'HTTP':
@@ -255,7 +255,6 @@ def _make_handler_class(func, proto, methods, pargs, qargs):
 
     cls = type(func.__name__ + '_handler', (base_class,), attrs)
     for m in methods:
-        setattr(cls, m.lower(), cls.do_handler_func) 
-    
-    return cls
+        setattr(cls, m.lower(), cls.do_handler_func)
 
+    return cls

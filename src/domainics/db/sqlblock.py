@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from ..util     import nameddict   as _nameddict
 from ..pillar   import _pillar_history, pillar_class, PillarError
-
+from ..domobj   import dobject
 
 _dsn_class = {}
 
@@ -143,6 +143,9 @@ class BaseSQLBlock:
         elif isinstance(stmt_or_params, tuple) or isinstance(stmt_or_params, dict):
             self.__execute(self.__todo_sqlstmt, params=stmt_or_params)        
             # self.__todo_sqlstmt = None
+        elif isinstance(stmt_or_params, dobject):
+            params = stmt_or_params.export()
+            self.__execute(self.__todo_sqlstmt, params=params)
         else:
             err =  'statement should be strm and '
             err += 'parameters should be a tuple, dict and list: %r'
