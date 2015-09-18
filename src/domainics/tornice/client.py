@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 import functools
 import http.client
@@ -11,7 +12,10 @@ from urllib.parse import urljoin
 from .. import json as _json
 from ..pillar import _pillar_history, pillar_class, PillarError
 
+import urllib.error
 
+
+from ..exception import UnauthorizedError, ForbiddenError, BusinessLogicError
 
 
 class RESTfulClient:
@@ -64,19 +68,44 @@ class RESTfulClient:
 
         assert post_args is None or json_args is None 
 
-        req = urllib.request.Request(req_url)
-
-        body = None
+        headers = dict(self.headers)
+        body    = None
         if json_args is not None:
-            req.add_header('Content-type', 'application/json')
-            body = _json.dumps(json_args)
+            headers['Content-type'] = 'application/json'
+            body = _json.dumps(json_args).encode('UTF-8')
 
         if post_args is not None:
-            req.add_header('Content-type', 'application/x-www-form-urlencoded')
-            body = urllib.parse.urlencode(qs_args)
+            headers['Content-type'] = 'application/x-www-form-urlencoded'
+            body = urllib.parse.urlencode(qs_args).encode('UTF-8')
+
+
+
+        req = urllib.request.Request(req_url, body, headers=headers)
+        req.get_method = lambda : method.upper()
 
         self._request = req
-        
+
+        # 
+        try :
+            res = self._opener.open(self._request)
+            data = self.decode_data(res)
+            self._response = RESTfulClient.Response(res, data)
+            return self._response
+        except urllib.error.HTTPError as ex:
+            res = ex
+            data = self.decode_data(ex)
+            data = data[0]
+
+            if res.status == 401 :
+                raise UnauthorizedError(data['message']) from ex
+
+            elif res.status == 403 :
+                raise UnauthorizedError(data['message']) from ex
+
+            elif res.status == 409 :
+                raise BusinessLogicError(data['message']) from ex
+
+            raise        
 
     def get(self, url=None, url_args=None, qs_args=None, 
             post_args=None, json_args=None):
@@ -91,33 +120,36 @@ class RESTfulClient:
     def put(self, url=None, url_args=None, qs_args=None, post_args=None, json_args=None):
         self.request('PUT', url, url_args, qs_args, post_args, json_args)
 
-    def put(self, url=None, url_args=None, qs_args=None, post_args=None, json_args=None):
+    def delete(self, url=None, url_args=None, qs_args=None, post_args=None, json_args=None):
         self.request('DELETE', url, url_args, qs_args, post_args, json_args)
 
     @property
     def response(self):
-        if self._response is None:
-            self._response = RESTfulClient.Response(self._opener.open(self._request))
-
         return self._response
 
 
+    @staticmethod
+    def decode_data(response):
+        data = response.read()
+         
+        headers = response.headers
+        content_type = headers.get_content_type()
+        charset = headers.get_content_charset()
+        if charset is None:
+            charset = 'UTF-8'
+
+        if content_type == 'application/json':
+            data = _json.loads(data.decode(charset))
+        elif content_type == 'text/plain':
+            data = self._data.decode(charset)
+
+        return data
+
     class Response:
         
-        def __init__(self, response):
+        def __init__(self, response, data):
             self._response = response
-            self._data = response.read()
-            
-            headers = response.headers
-            content_type = headers.get_content_type()
-            charset = headers.get_content_charset()
-            if charset is None:
-                charset = 'UTF-8'
-
-            if  content_type == 'application/json':
-                self._data = _json.loads(self._data.decode(charset))
-            elif content_type == 'text/plain':
-                self._data = self._data.decode(charset)
+            self._data = data
 
         @property
         def status(self):

@@ -31,9 +31,10 @@ class DBArray(dset):
 
 def array(item_type, iterable=None, dimensions=1, doc=None):
     cls_attrs = dict(dimensions=dimensions, item_type=item_type)
-    cls_name  = '_DBArray_%dD' % dimensions
+    cls_name = '_DBArray_%dD' % dimensions
 
     return type(cls_name, (DBArray,), cls_attrs)
+
 
 class json_object(object):
     @classmethod
@@ -41,11 +42,12 @@ class json_object(object):
         if issubclass(value.__class__, (list, dict)):
             return value
 
-        raise ValueError("the assigned value type should be one of 'list', 'dict'")
-
+        raise ValueError("the assigned value type should be one of"
+                         " 'list', 'dict'")
 
 
 class dsequence:
+    """"""
 
     def __init__(self, value=None):
         if value is None or isinstance(value, int):
@@ -57,7 +59,7 @@ class dsequence:
             err %= value.__class__.__name__
             raise TypeError(err)
 
-    @property    
+    @property
     def value(self):
         if self.__value is None:
             err = 'The sequence number %s is not allocated'
@@ -89,6 +91,3 @@ class dsequence:
             return repr(self.__value)
         else:
             return self.__class__.__name__ + '(' + ')'
-
-
-
