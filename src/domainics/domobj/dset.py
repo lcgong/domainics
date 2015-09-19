@@ -7,9 +7,8 @@ from collections.abc import Iterable, Mapping
 
 
 from .metaclass import datt, daggregate
-from .dobject import dobject
-from .reshape import reshape
-
+from ._dobject import dobject
+from ._reshape import reshape
 
 class dset(daggregate):
     """
@@ -93,10 +92,10 @@ class dset(daggregate):
             if hasattr(iterable, '__dset__'):
                 dset_iter = getattr(iterable, '__dset__')
                 for obj in dset_iter(item_type):
-                    self.append(obj)
+                    self.add(obj)
             else:
                 for obj in iterable:
-                    self.append(obj)
+                    self.add(obj)
 
 
     def add(self, obj):

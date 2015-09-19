@@ -32,8 +32,8 @@ by forbidding external objects from holding references to its members.
 
 """
 
-
-from .dobject import dobject
-from .reshape import reshape
-from .dset import dset
+#
 from .metaclass import datt, daggregate
+from ._dobject import dobject
+from .dset import dset
+from ._reshape import reshape

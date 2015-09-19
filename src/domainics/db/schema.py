@@ -8,7 +8,10 @@ from collections.abc import Iterable
 # from .. import json
 from ..db.sqlblock import transaction, dbc
 from ..util     import iter_submodules
-from ..domobj   import dobject, datt, dset
+
+from ..domobj.metaclass import datt
+from ..domobj._dobject import dobject
+from ..domobj.dset import dset
 
 import textwrap
 
@@ -21,7 +24,7 @@ def repr_create_table(dobj_cls):
         segments.append(s)
 
     if dobj_cls._dobj_id_names:
-        s = '  PRIMARY KEY(%s)' 
+        s = '  PRIMARY KEY(%s)'
         s %=  ','.join(dobj_cls._dobj_id_names)
         segments.append(s)
 
@@ -31,7 +34,7 @@ def repr_create_table(dobj_cls):
         table_name = dobj_cls.__name__
 
     sql = ''.join([
-        'CREATE TABLE IF NOT EXISTS ', table_name, 
+        'CREATE TABLE IF NOT EXISTS ', table_name,
         ' (\n', ',\n'.join(segments), '\n);'
         ])
     yield sql
@@ -49,9 +52,9 @@ def repr_create_table(dobj_cls):
     for name, attr in dobj_cls._dobj_attrs.items():
         if attr.doc:
             doc = textwrap.dedent(attr.doc)
-            sql = "COMMENT ON COLUMN %s.%s IS '%s';" 
+            sql = "COMMENT ON COLUMN %s.%s IS '%s';"
             sql %= (table_name, name, quote(doc))
-            yield sql       
+            yield sql
 
 def repr_datatype(dtype, length=None):
     datatype = None
@@ -77,10 +80,10 @@ def repr_datatype(dtype, length=None):
         if length is not None:
             datatype = 'FLOAT(%d)' % length
         else:
-            datatype = 'FLOAT' # 8 bytes    
+            datatype = 'FLOAT' # 8 bytes
 
     elif dtype == bool:
-        datatype = 'BOOLEAN'    
+        datatype = 'BOOLEAN'
 
     elif dtype == Decimal:
         if not length:
@@ -114,17 +117,17 @@ def repr_datatype(dtype, length=None):
     if datatype:
         return datatype
 
-    raise TypeError('unkown type: %s' % dtype.__name__) 
+    raise TypeError('unkown type: %s' % dtype.__name__)
 
 
 def repr_create_sequence(dobj_cls):
     start = dobj_cls.start if dobj_cls.start is not None else 1
     step  = dobj_cls.step  if dobj_cls.step  is not None else 1
     s = [
-        'CREATE SEQUENCE ', dobj_cls.__name__,  
-        ' INCREMENT BY ', repr(step), 
-        ' START WITH ', repr(start), ';' 
-        ]    
+        'CREATE SEQUENCE ', dobj_cls.__name__,
+        ' INCREMENT BY ', repr(step),
+        ' START WITH ', repr(start), ';'
+        ]
 
     s = ''.join(s)
 
@@ -141,12 +144,12 @@ def repr_create_sequence(dobj_cls):
             yield sql
 
 def repr_drop_table(dobj_cls):
-    s = "DROP TABLE IF EXISTS %s;" 
+    s = "DROP TABLE IF EXISTS %s;"
     s %= dobj_cls.__name__
     yield s
 
 def repr_drop_sequence(dobj_cls):
-    s = "DROP SEQUENCE IF EXISTS %s;" 
+    s = "DROP SEQUENCE IF EXISTS %s;"
     s %= dobj_cls.__name__
     yield s
 
@@ -177,7 +180,7 @@ class DBSchema:
                 if not isinstance(obj, type):
                     continue
 
-                if not issubclass(obj, (dtable, dsequence)) :  
+                if not issubclass(obj, (dtable, dsequence)) :
                     continue
 
                 if obj is dtable or obj is dsequence:
@@ -187,14 +190,14 @@ class DBSchema:
 
                 if qual_name in seen:
                     continue
-                
+
                 seen.add(qual_name)
 
                 if obj.__name__ in table_names:
-                    errmsg = "Database relation '%s' has already been defined in %s" 
+                    errmsg = "Database relation '%s' has already been defined in %s"
                     errmsg %= (obj.__name__, table_names[obj.__name__])
                     raise TypeError(errmsg)
-                
+
                 table_names[obj.__name__] = qual_name
 
                 self.schema_objs.append(obj)
@@ -250,4 +253,3 @@ class DBSchema:
 
         stmts = '\n'.join(stmts)
         self.__tfunc(stmts)
-

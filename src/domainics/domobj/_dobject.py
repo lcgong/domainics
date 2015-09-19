@@ -12,48 +12,9 @@ from collections.abc import Iterable, Mapping
 
 from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr
 
-from .reshape import ReshapeOperator, reshape
+from ._reshape import ReshapeOperator, reshape
 
 class dobject(metaclass=DObjectMetaClass):
-
-    def _reshape(self, statement):
-        """"""
-        this_class = self.__class__
-
-        selected_attrs = OrderedDict()
-        if statement.required:
-            for attr_name, attr in iter_chain(
-                                        this_class.__primary_key__,items(),
-                                        this_class.__value_attrs__.items()):
-
-                if attr_name not in statement.requred:
-                    continue
-
-                if attr_name in statement.ignore:
-                    continue
-                selected_attrs[attr_name] = attr
-
-        else:
-            for attr_name, attr in iter_chain(
-                                        this_class.__primary_key__.items(),
-                                        this_class.__value_attrs__.items()):
-
-                if attr_name not in statement.ignored:
-                    selected_attrs[attr_name] = attr
-
-
-        if isinstance(statement.source, dobject):
-            for attr_name, attr in selected_attrs.items():
-                if hasattr(statement.source, attr_name):
-                    attr_val = getattr(statement.source, attr_name)
-                    attr.set_value_unguardedly(self, attr_val)
-
-        elif isinstance(statement.source, Mapping):
-            for attr_name, attr in selected_attrs.items():
-                if attr_name in statement.source:
-                    attr.set_value_unguardedly(self,
-                                                statement.source[attr_name])
-
 
     def __new__(cls, *values, **kwvalues):
         """
@@ -65,11 +26,12 @@ class dobject(metaclass=DObjectMetaClass):
         instance_setattr = super(dobject, instance).__setattr__
         instance_setattr('__value_dict__', attr_values)
 
-        if not values and not kwvalues:  # empty object
-            return instance
+        # if not values and not kwvalues:  # empty object
+        #     return instance
 
-        if values and isinstance(values[0], ReshapeOperator):
-            instance._reshape(values.pop()) # consume the argument
+        if values and isinstance(values[0], ReshapeOperator): # have a peek
+            # this argument value is reshape operator, consume it
+            values.pop().reshape_object(instance)
 
         parameters = OrderedDict(iter_chain(cls.__primary_key__.items(),
                                             cls.__value_attrs__.items()))

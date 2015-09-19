@@ -241,12 +241,15 @@ class DObjectMetaClass(type):
 
 
 
-        setattr(cls, '__primary_key_class__', namedtuple('PK', pkey_attrs.keys()))
+        setattr(cls, '__primary_key_class__',
+                                        namedtuple('PK', pkey_attrs.keys()))
         setattr(cls, '__primary_key__', pkey_attrs)
         setattr(cls, '__value_attrs__', value_attrs)
 
         return cls
 
+    # def __repr__(self):
+    #     return 'A'
 
 def cast_attr_value(attrname, val, attr_type):
     if val is None:
