@@ -8,7 +8,6 @@ from itertools import chain as iter_chain
 from ..util import NamedDict
 from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr
 
-
 def reshape(source, *operands, **kwoperands):
     """Reshape a domain object into a new domain object.
 
@@ -157,9 +156,14 @@ class ReshapeOperator:
                 prop_dict[attr_name] = attr
 
         pkey_attrs = []
-        for attr in (self._primary_key if self._primary_key else tmpl_attrs):
-            if attr.name not in prop_dict:
-                continue
+        for attr in (self._primary_key if self._primary_key else tmpl_pkey):
+            if isinstance(attr, str):
+                if attr not in prop_dict:
+                    continue
+                attr = prop_dict[attr]
+            else:
+                if attr.name not in prop_dict:
+                    continue
             pkey_attrs.append(attr)
 
         prop_dict['__primary_key__'] = pkey_attrs
@@ -209,7 +213,7 @@ class ReshapeOperator:
                 if attr_name not in self.ignored:
                     selected_attrs[attr_name] = attr
 
-
+        from ._dobject import dobject
         if isinstance(self.source, dobject):
             for attr_name, attr in selected_attrs.items():
                 if hasattr(self.source, attr_name):

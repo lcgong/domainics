@@ -102,13 +102,16 @@ class dset(daggregate):
         """
         If the identity of obj has been added, replace the old one with it.
         """
-        if isinstance(obj, self.item_type):
-            pass
+        if isinstance(obj, dobject):
+            if obj.__class__ != self.item_type:
+                # reshape the object because of the different doject clasess
+                obj = self.item_type(reshape(obj))
         elif isinstance(obj, Mapping):
             obj = self.item_type(reshape(obj)) # reshape the dict object
         else:
-            errmsg = "The aggregate object should be %s or mapping object"
-            errmsg %= self.item_type.__name__
+            errmsg = ("The aggregate object should be "
+                      "dobject or mapping object: %r")
+            errmsg %= obj
             raise TypeError(errmsg)
 
         pkey = self._item_primary_key_class(*tuple(getattr(obj, n)
