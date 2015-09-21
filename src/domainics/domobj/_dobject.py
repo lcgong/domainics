@@ -64,7 +64,8 @@ class dobject(metaclass=DObjectMetaClass):
 
         # set default values for these left parameters
         for attr_name, attr in parameters.items():
-            getattr(instance, attr_name)  # force it to get chance to check default value
+            getattr(instance, attr_name)
+            # force it to get chance to check default value
 
         pkey_att_vals = tuple(getattr(instance, attr_name)
                                 for attr_name in cls.__primary_key__)

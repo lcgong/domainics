@@ -6,8 +6,10 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
 # from .. import json
-from ..db.sqlblock import transaction, dbc
+from .sqlblock import transaction, dbc
+from .dtable import dtable, dsequence
 from ..util     import iter_submodules
+
 
 from ..domobj.metaclass import datt
 from ..domobj._dobject import dobject
@@ -15,17 +17,22 @@ from ..domobj.dset import dset
 
 import textwrap
 
+from itertools import chain as iter_chain
 
 def repr_create_table(dobj_cls):
 
+    attrs = OrderedDict((attr_name, attr) for attr_name, attr in
+                        iter_chain(dobj_cls.__primary_key__.items(),
+                                   dobj_cls.__value_attrs__.items()))
+
     segments = []
-    for name, attr in dobj_cls._dobj_attrs.items():
-        s = '  %s %s' % (name, repr_datatype(attr.datatype, attr.len))
+    for name, attr in attrs.items():
+        s = '  %s %s' % (name, repr_datatype(attr.type, attr.len))
         segments.append(s)
 
-    if dobj_cls._dobj_id_names:
+    if dobj_cls.__primary_key__:
         s = '  PRIMARY KEY(%s)'
-        s %=  ','.join(dobj_cls._dobj_id_names)
+        s %=  ','.join(dobj_cls.__primary_key__.keys())
         segments.append(s)
 
     if hasattr(dobj_cls, '__tablename__'):
@@ -49,7 +56,7 @@ def repr_create_table(dobj_cls):
             sql %= (table_name, quote(doc))
             yield sql
 
-    for name, attr in dobj_cls._dobj_attrs.items():
+    for name, attr in attrs.items():
         if attr.doc:
             doc = textwrap.dedent(attr.doc)
             sql = "COMMENT ON COLUMN %s.%s IS '%s';"
@@ -225,8 +232,11 @@ class DBSchema:
                     for stmt in repr_create_sequence(db_cls):
                         stmts.append(stmt)
             except Exception as ex:
-                errmsg = 'caught exception while scheming %s' % (db_cls.__name__)
-                raise TypeError(errmsg) from ex
+                # print(ex)
+                errmsg = 'caught exception while scheming %s (%r)'
+                errmsg %= (db_cls.__name__, ex)
+                # raise TypeError(errmsg) from ex
+                raise
 
         stmts = '\n'.join(stmts)
         self.__tfunc(stmts)

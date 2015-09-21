@@ -87,11 +87,14 @@ class dset(daggregate):
 
 
         self.__attr_doc  = doc
+        #
+        # if iterable is None and from is not None:
+        #     iterable = from
 
         if iterable is not None:
             if hasattr(iterable, '__dset__'):
                 dset_iter = getattr(iterable, '__dset__')
-                for obj in dset_iter(item_type):
+                for obj in dset_iter(self.item_type):
                     self.add(obj)
             else:
                 for obj in iterable:
@@ -250,7 +253,7 @@ class dset(daggregate):
         elif isinstance(index, int):
             item = self.__list[index]
             del self.__list[index]
-            del self.__map[item._dobj_id]
+            del self.__map[item.__primary_key__]
 
         elif isinstance(index, slice):
             lst = [self.index(item) for item in self.__list.__getitem__(index)]

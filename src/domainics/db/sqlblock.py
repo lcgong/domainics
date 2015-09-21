@@ -3,8 +3,9 @@
 import logging
 
 import functools
-from collections  import OrderedDict as _OrderedDict
+from collections  import OrderedDict
 from collections  import namedtuple  as _namedtuple
+from itertools import chain as iter_chain
 from abc import abstractmethod
 
 from ..util     import nameddict   as _nameddict
@@ -22,7 +23,7 @@ def set_dsn(**kwargs):
 
         _dsn_class[dsn] = _pg.PostgreSQLBlock
         _pg.PostgreSQLBlock.set_dsn(**kwargs)
-        
+
     elif dbsys in ('sqlite'):
         raise NotImplemented('sqlite')
 
@@ -32,12 +33,12 @@ def set_dsn(**kwargs):
         raise ValueError('unkown DBMS: ' + dbsys)
 
 def sqlblock(dsn='DEFAULT', autocommit=False, record_type=None):
-    
+
     sqlblock_class = _dsn_class[dsn]
 
     blkobj = sqlblock_class(
-        dsn=dsn, 
-        autocommit=autocommit, 
+        dsn=dsn,
+        autocommit=autocommit,
         record_type=record_type)
 
     return blkobj
@@ -45,7 +46,7 @@ def sqlblock(dsn='DEFAULT', autocommit=False, record_type=None):
 def record_dict(cursor):
     fields = (d[0] for d in cursor.description)
     for row in cursor:
-        yield _OrderedDict(zip(fields, row))
+        yield OrderedDict(zip(fields, row))
 
 def record_namedtuple(cursor):
     dt = _namedtuple("Row", [d[0] for d in cursor.description or ()])
@@ -65,14 +66,14 @@ def make_record_dtable(dobj_cls):
         nonlocal attrnames
 
         fields = [d[0] for d in cursor.description or ()]
-        
+
         colnames, colidxs = [], []
         for i, f in enumerate(fields):
             if f not in attrnames:
                 continue
             colnames.append(f)
             colidxs.append(i)
-        
+
 
         dt = _nameddict("Row", [d[0] for d in cursor.description or ()])
         # for row in cursor:
@@ -80,7 +81,7 @@ def make_record_dtable(dobj_cls):
 
 class BaseSQLBlock:
     def __init__(self, dbtype, dsn='DEFAULT', autocommit=False, record_type=None):
-        
+
         self._record_type = record_type or _default_record_type
 
         self.dbtype = dbtype
@@ -91,7 +92,7 @@ class BaseSQLBlock:
         self.__todo_sqlstmt   = None
 
         self._logger = logging.getLogger(__name__)
-        
+
     def __enter__(self):
         self._open()
         return self
@@ -111,13 +112,14 @@ class BaseSQLBlock:
         return False
 
     def __lshift__(self, stmt_or_params):
-        """push SQL statement or parameters to dbc. 
+        # """
+        # push SQL statement or parameters to dbc.
+        # #
+        # # dbc << 'SELECT %s'
+        # # dbc << (100,)
+        #
+        # """
 
-        dbc << 'SELECT %s'
-        dbc << (100,) 
-
-        """
-        
         if not stmt_or_params: # when '' or None is pushed, clear sql stmt
             self.__todo_sqlstmt = None
             return self
@@ -140,8 +142,8 @@ class BaseSQLBlock:
         if isinstance(stmt_or_params, list):
             self.__execute(self.__todo_sqlstmt, many=stmt_or_params)
             # self.__todo_sqlstmt = None
-        elif isinstance(stmt_or_params, tuple) or isinstance(stmt_or_params, dict):
-            self.__execute(self.__todo_sqlstmt, params=stmt_or_params)        
+        elif isinstance(stmt_or_params, (tuple, dict)):
+            self.__execute(self.__todo_sqlstmt, params=stmt_or_params)
             # self.__todo_sqlstmt = None
         elif isinstance(stmt_or_params, dobject):
             params = stmt_or_params.export()
@@ -175,10 +177,10 @@ class BaseSQLBlock:
         finally:
             self._cur_record_type = None
 
-    @property 
+    @property
     def rowcount(self):
         """
-        This read-only attribute specifies the number of rows that the last 
+        This read-only attribute specifies the number of rows that the last
         query or the number of affected rows by DML statements.
         """
         self._cursor.rowcount
@@ -193,31 +195,33 @@ class BaseSQLBlock:
 
     @abstractmethod
     def nextval(self, seq, batch_cnt=None):
-        raise NotImplemented()        
+        raise NotImplemented()
 
     def __dset__(self, item_type):
 
-        dobj_attrs = item_type._dobj_attrs
+        dobj_attrs = OrderedDict((attr_name, attr) for attr_name, attr in
+                            iter_chain(item_type.__primary_key__.items(),
+                                       item_type.__value_attrs__.items()))
+
         colnames = []
         selected = []
         for i, d in enumerate(self._cursor.description):
             colname = d[0]
             if colname in dobj_attrs:
                 selected.append(i)
-            colnames.append(colname)
+                colnames.append(colname)
 
+        print(colnames)
         for record in self._cursor:
-            instance  = item_type()
-            attr_vals = getattr(instance, '_dobject__attrs')
-            for i in selected:
-                attr_vals[colnames[i]] = record[i]
 
-            yield instance
+            obj = dict((k, v) for k, v in
+                                zip(colnames, (record[i] for i in selected)))
+            yield item_type(**obj)
 
-    
+
 def _new_dobject(dobj_cls, attr_pairs):
     """new dobject with attribute (name, value) pairs"""
-    
+
     instance = dobj_cls()
 
     attrs  = dobj_cls._dobj_attrs
@@ -238,24 +242,24 @@ dbc = _SQLPillar(_pillar_history)
 
 def transaction(*d_args, dsn='DEFAULT', autocommit=False):
     """ 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
-    
+
     @with_sql
     @with_sql()
     @with_sql(auto_commit=True, dsn='other_db')
-    
+
     具体使用，必须提供第一个参数
     @with_sql()
     def do_something(self, arg):
         ...
         return ...
-        
+
     如果该实例已经存在非空的sql属性则会抛出AttributeError
     """
-    
+
     def _decorator(func):
         def sqlblock_wrapper(*args, **kwargs):
 
-            if dbc._this_object is not None: 
+            if dbc._this_object is not None:
                 # no allow to reenter a new transaction
                 return func(*args, **kwargs)
             else:
@@ -264,7 +268,7 @@ def transaction(*d_args, dsn='DEFAULT', autocommit=False):
                 def exit_callback(etyp, eval, tb):
                     sqlblk.__exit__(etyp, eval, tb)
 
-                bound_func = _pillar_history.bound(func, 
+                bound_func = _pillar_history.bound(func,
                                             [(dbc, sqlblk)], exit_callback)
 
                 sqlblk.__enter__()
@@ -277,13 +281,12 @@ def transaction(*d_args, dsn='DEFAULT', autocommit=False):
                     raise PillarError('sql block cannot return a pillar object')
 
                 return ret
-                
+
         functools.update_wrapper(sqlblock_wrapper, func)
         return sqlblock_wrapper
-    
-    if len(d_args) == 1 and callable(d_args[0]): 
+
+    if len(d_args) == 1 and callable(d_args[0]):
         # no argument decorator
         return _decorator(d_args[0])
     else:
         return _decorator
-

@@ -4,16 +4,20 @@ import datetime
 from decimal import Decimal
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
+from itertools import chain as iter_chain
 
+from ..domobj import dset
+from .dtable import json_object, dtable, dsequence
 
+from .sqlblock import dbc
 
-_dtdelta = namedtuple('DTDelta', ['pkeys', 'fields', 'pkvals', 'values'])
-
+_EntryTuple = namedtuple('EntryTuple', ['pkey_attrs', 'pkey_values',
+                                        'attrs',  'values'])
 
 def _dtable_diff(current, past=None):
     """diff dtable object, return the delta information.
 
-    The delta information is a tuple, the data is added, changged and removed. 
+    The delta information is a tuple, the data is added, changged and removed.
     """
     if current is None and past is None:
         return
@@ -44,12 +48,15 @@ def _dtable_diff(current, past=None):
     if past is None:
         past = dset(item_type=current.item_type)
 
-    inslst = [] # the objects to be inserted
-    dellst = [] # the objid to be deleted
-    chglst = [] # the current and past objects to be modified
 
 
-    attrnames = tuple(current.item_type._dobj_attrs.keys())
+    inslst = [] # [obj] the objects to be inserted
+    dellst = [] # [objid] the objid to be deleted
+    chglst = [] # [{attr: (current, past)}],  modified
+
+    item_type = current.item_type
+    pkey_attrs = item_type.__primary_key__
+    value_attrs = item_type.__value_attrs__
     for curr_obj in current:
         if curr_obj not in past:
             inslst.append(curr_obj)
@@ -58,68 +65,60 @@ def _dtable_diff(current, past=None):
         past_obj = past[curr_obj]
 
         modified = OrderedDict()
-        for attrname in attrnames:
-            if not hasattr(past_obj, attrname):
+        for attr_name in value_attrs:
+            if not hasattr(past_obj, attr_name):
                 continue
 
-            newval = getattr(curr_obj, attrname)
-            oldval = getattr(past_obj, attrname)
+            newval = getattr(curr_obj, attr_name)
+            oldval = getattr(past_obj, attr_name)
             if newval == oldval:
                 continue
 
-            modified[attrname] = (newval, oldval)
-            # modified_attrs.add(attrname)
+            modified[attr_name] = (newval, oldval)
 
         if modified:
-            chglst.append((curr_obj._dobj_id, modified))
+            chglst.append((curr_obj.__primary_key__, modified))
 
     for past_obj in past:
         if past_obj not in current:
             dellst.append(past_obj)
 
     # inserted data tuple
-    item_type = current.item_type
-    pkeys = tuple(item_type._dobj_id_names)
-    fields  = tuple(f for f in item_type._dobj_attrs if f not in pkeys)
     pkvals, values = [], []
-    for obj in inslst:
-        pkvals.append(tuple(getattr(obj, f) for f in pkeys))
-        
-        item_val = []
-        for fieldname in fields:
-            field = item_type._dobj_attrs[fieldname]
-            field_value = getattr(obj, fieldname)
+    for obj in inslst: # objects to be inserted
+        pkvals.append(tuple(getattr(obj, f) for f in pkey_attrs))
 
-            if issubclass(field.datatype, json_object):
-                field_value = json.dumps(field_value)
-            
-            item_val.append(field_value)
+        attr_values = []
+        for attr_name, attr in value_attrs.items():
+            attr_value = getattr(obj, attr_name)
 
-        values.append(tuple(item_val))
-    
-    dt_ins = _dtdelta(pkeys, fields, pkvals, values)
+            if (issubclass(attr.type, json_object)
+                    and isinstance(attr_value, str)):  # json cast
+                attr_value = json.dumps(attr_value)
+
+            attr_values.append(attr_value)
+
+        values.append(tuple(attr_values))
+
+    dt_ins = _EntryTuple(pkey_attrs, pkvals, value_attrs, values)
 
     # deleted data tuple
     item_type = past.item_type
-    pkeys  = tuple(item_type._dobj_id_names)
     pkvals = []
     for obj in dellst:
-        pkvals.append(tuple(getattr(obj, f) for f in pkeys))
-    
-    dt_del = _dtdelta(pkeys, None, pkvals, None)
+        pkvals.append(tuple(getattr(obj, f) for f in pkey_attrs))
+
+    dt_del = _EntryTuple(pkey_attrs, pkvals, None,  None)
 
     # modified data tuple
-    item_type = past.item_type
-    pkeys  = tuple(item_type._dobj_id_names)
-    fields = tuple(f for f in item_type._dobj_attrs if f not in pkeys)
 
     pkvals = []
     values = []
     for objid, modified in chglst:
-        pkvals.append(tuple(getattr(objid, f) for f in pkeys))
+        pkvals.append(tuple(getattr(objid, f) for f in pkey_attrs))
         values.append(modified)
 
-    dt_chg = _dtdelta(pkeys, fields, pkvals, values)
+    dt_chg = _EntryTuple(pkey_attrs, pkvals,  value_attrs, values)
 
     return dt_ins, dt_chg, dt_del
 
@@ -128,17 +127,22 @@ def pq_dtable_merge(current, past):
     dins, dchg, ddel = _dtable_diff(current, past)
     table_name = current.item_type.__name__
 
+    dobj_cls = current.item_type
+    attrs = OrderedDict((attr_name, attr) for attr_name, attr in
+                        iter_chain(dobj_cls.__primary_key__.items(),
+                                   dobj_cls.__value_attrs__.items()))
+
     seq_attrs = {}
-    for n, f in current.item_type._dobj_attrs.items():
-        if issubclass(f.datatype, dsequence):
-            seq_attrs[n] = f
+    for n, attr in attrs.items():
+        if issubclass(attr.type, dsequence):
+            seq_attrs[n] = attr
 
 
     if dins.values:
-        cols = dins.pkeys + dins.fields
-        values = [k + v for k, v in zip(dins.pkvals, dins.values)]
+        cols = tuple(iter_chain(dins.pkey_attrs.keys(), dins.attrs.keys()))
+        values = [k + v for k, v in zip(dins.pkey_values, dins.values)]
 
-        # If there are new sequence objects, 
+        # If there are new sequence objects,
         # get next values of them in a batch
         if seq_attrs:
             seq_cols = [] # (col_idx, col_name, [seq_value])
@@ -162,14 +166,14 @@ def pq_dtable_merge(current, past):
 
                 for seq, value in zip(seqvals, newvals):
                     seq.value = value
-        
+
         dbc << """
-        INSERT INTO {table} ({cols}) 
+        INSERT INTO {table} ({cols})
         VALUES ({vals});
-        """.format(table=table_name, 
-                   cols=', '.join(cols), 
+        """.format(table=table_name,
+                   cols=', '.join(cols),
                    vals=', '.join(['%s'] * len(cols)))
-        
+
         dbc << values
 
     if dchg.values:
@@ -183,7 +187,7 @@ def pq_dtable_merge(current, past):
                     if colname in seq_attrs:
                         try:
                             seqvals = seq_cols[colname]
-                        except KeyError: 
+                        except KeyError:
                             seq_cols[colname] = seqvals = []
 
                         seqvals.append(record[colname][0])
@@ -210,29 +214,31 @@ def pq_dtable_merge(current, past):
 
             chgidxs.append(i)
 
-        pkcond = ' AND '.join(['{pk}=%s'.format(pk=pk) for pk in dchg.pkeys])
+        pkcond = ' AND '.join(['{pk}=%s'.format(pk=pk)
+                                    for pk in dchg.pkey_attrs])
         for grpid, chgidxs in groups.items():
             asgn_expr = ', '.join(['%s=%%s' % name for name in grpid])
 
             dbc << """
             UPDATE {table} SET
-            {asgn} 
+            {asgn}
             WHERE {pkcond}
             """.format(table=table_name, asgn=asgn_expr, pkcond=pkcond)
 
             for i in chgidxs:
                 values = tuple(dchg.values[i][k][0] for k in grpid)
-                pkvals = dchg.pkvals[i]
+                pkvals = dchg.pkey_values[i]
                 dbc << values + pkvals
 
-    if ddel.pkvals:
-        pkcond = ' AND '.join(['{pk}=%s'.format(pk=pk) for pk in ddel.pkeys])
+    if ddel.pkey_values:
+        pkcond = ' AND '.join(['{pk}=%s'.format(pk=pk)
+                                    for pk in ddel.pkey_attrs])
 
         dbc << """
         DELETE FROM {table} WHERE {pkcond};
         """.format(table=table_name, pkcond=pkcond)
-        
-        dbc << [k for k in ddel.pkvals]
+
+        dbc << [k for k in ddel.pkey_values]
 
 def dmerge(current, past=None):
     if dbc.dbtype == 'postgres':

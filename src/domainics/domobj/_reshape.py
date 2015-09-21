@@ -44,7 +44,7 @@ class ReshapeOperator:
         self.ignored = OrderedDict()
         self._base = []
         self._primary_key = None
-        self._reshaped_class_name = None
+        self._name = None
 
         self.parse_operands(operands, kwoperands)
 
@@ -91,9 +91,9 @@ class ReshapeOperator:
                             raise ValueError()
                 else:
                     raise ValueError()
-            elif arg == '_class_name' :
+            elif arg == '_name' :
                 if isinstance(arg_value, str):
-                    self._reshaped_class_name = arg_value
+                    self._name = arg_value
                 else:
                     raise ValueError()
             elif arg == '_primary_key':
@@ -181,11 +181,11 @@ class ReshapeOperator:
         else:
             base_cls = tuple(self._base)
 
-        if not self._reshaped_class_name:
-            if not self.source.__name__.endswith('_Reshaped'):
-                self._reshaped_class_name = self.source.__name__ + '_Reshaped'
+        if not self._name:
+            self._name = self.source.__name__ # keey the name
 
-        reshaped_cls = type(self._reshaped_class_name, base_cls, prop_dict)
+
+        reshaped_cls = type(self._name, base_cls, prop_dict)
         return reshaped_cls
 
     def reshape_object(self, instance):
