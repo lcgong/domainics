@@ -5,12 +5,11 @@ from collections import namedtuple
 
 from collections.abc import Iterable, Mapping
 
-
-from .metaclass import datt, daggregate
+from .metaclass import datt, daggregate, DSet
 from ._dobject import dobject
 from ._reshape import reshape
 
-class dset(daggregate):
+class dset(daggregate, DSet):
     """
     The aggregate object set of domain object.
     """
@@ -292,6 +291,8 @@ class dset(daggregate):
             errmsg %= (index.__class__.__name__, index)
             raise TypeError(errmsg)
 
+    def __hash__(self):
+        return hash(self)
 
     def __eq__(self, other):
         if isinstance(other, dset):

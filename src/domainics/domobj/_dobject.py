@@ -10,11 +10,11 @@ from ..util import NamedDict
 
 from collections.abc import Iterable, Mapping
 
-from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr
+from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr, DObject
 
 from ._reshape import ReshapeOperator, reshape
 
-class dobject(metaclass=DObjectMetaClass):
+class dobject(DObject, metaclass=DObjectMetaClass):
 
     def __new__(cls, *values, **kwvalues):
         """

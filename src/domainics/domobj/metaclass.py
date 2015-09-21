@@ -4,6 +4,7 @@
 from collections import OrderedDict
 from collections import namedtuple
 from collections.abc import Iterable
+from typing import TypeVar, Mapping, Generic
 
 
 
@@ -178,11 +179,11 @@ class DObjectMetaClass(type):
         pkey_attrs = OrderedDict()
         value_attrs = OrderedDict()
         for base_cls in reversed(bases): # overwriting priority, keep the first.
-            attrs = getattr(base_cls, '__primary_key__')
+            attrs = getattr(base_cls, '__primary_key__', None)
             if attrs is not None:
                 pkey_attrs.update(attrs)
 
-            attrs = getattr(base_cls, '__value_attrs__')
+            attrs = getattr(base_cls, '__value_attrs__', None)
             if attrs is not None:
                 value_attrs.update(attrs)
 
@@ -264,3 +265,12 @@ def cast_attr_value(attrname, val, attr_type):
         err = "The attribute '%s' should be \'%s\' type, not '%s'"
         err %= (attrname, attr_type.__name__, type(val).__name__)
         raise TypeError(err).with_traceback(ex.__traceback__)
+
+
+class DObject():
+    pass
+
+T = TypeVar('T')
+
+class DSet(Generic[T]):
+    pass
