@@ -161,7 +161,7 @@ def pq_dtable_merge(current, past):
                     continue
 
                 # nextval of sequence
-                seqname = seq_attrs[colname].datatype.__name__
+                seqname = seq_attrs[colname].type.__name__
                 newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
 
                 for seq, value in zip(seqvals, newvals):

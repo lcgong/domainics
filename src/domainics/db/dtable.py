@@ -42,6 +42,9 @@ def array(item_type, iterable=None, dimensions=1, doc=None):
 class json_object(object):
     @classmethod
     def __setter_filter__(cls, value):
+        if value is None:
+            return None
+
         if issubclass(value.__class__, (list, dict)):
             return value
 

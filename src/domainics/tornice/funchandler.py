@@ -95,9 +95,9 @@ class BaseFuncRequestHandler(RequestHandler):
 
         tb_list = filter_traceback(exc_tb, excludes=['domainics.', 'tornado.'])
 
-        errmsg = '%s[%d, %s]: %s'
-        errmsg %= (exc_type.__name__, status_code, self.request.path, message)
-        self.logger.error(errmsg, exc_info=exc_info)
+        # errmsg = '%s[%d, %s]: %s'
+        # errmsg %= (exc_type.__name__, status_code, self.request.path, message)
+        # self.logger.error(errmsg, exc_info=exc_info)
 
         return status_code, reason, message, tb_list
 
@@ -124,19 +124,18 @@ class BaseFuncRequestHandler(RequestHandler):
     def parse_arguments(self, args, kwargs):
         arguments = OrderedDict()
         func_sig = inspect.signature(self.handler_func)
-        for arg_name, arg_sepc in func_sig.parameters.item():
-
+        for arg_name, arg_spec in func_sig.parameters.items():
             if 'json_arg' == arg_name:
                 # get json argument from body of http message
                 arg_val = self._read_json_object()
 
             elif arg_spec.annotation != inspect._empty:
-                ann = arg_spect.annotation
+                ann = arg_spec.annotation
                 if ann.__origin__ == DSet[Any].__origin__:
                     arg_val = dset(arg_type, self._read_json_object())
 
                 elif issubclass(ann, DObject):
-                    arg_val = arg_type(reshape(self._read_json_object())
+                    arg_val = arg_type(reshape(self._read_json_object()))
 
                 else:
                     errmsg = "Unknow type hinting: %s"
@@ -156,17 +155,20 @@ class BaseFuncRequestHandler(RequestHandler):
                 if arg_type != str and arg_val is not None:
                     arg_val = arg_type(arg_val)
             else:
-                if param.default is inspect._empty :
+                if arg_spec.default is inspect._empty :
                     arg_val = None
                 else:
                     arg_val = param.default
 
             arguments[arg_name] = arg_val
 
+        return arguments
+
 
     def do_handler_func(self, *args, **kwargs) :
 
         arguments = self.parse_arguments(args, kwargs)
+        print(arguments)
 
         self._handler_args = arguments
 
@@ -191,7 +193,7 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
         obj = super(RESTFuncRequestHandler, self).do_handler_func(*args, **kwargs)
 
         if not isinstance(obj, (list, tuple, dset)):
-            obj = [obj]
+            obj = [obj] if obj is not None else []
 
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps(obj))

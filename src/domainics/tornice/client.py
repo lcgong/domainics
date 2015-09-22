@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import functools
 import http.client
 import urllib.parse
@@ -27,7 +28,7 @@ class RESTfulClient:
 
         self.__response = None
 
-        policy = DefaultCookiePolicy(rfc2965=True, 
+        policy = DefaultCookiePolicy(rfc2965=True,
                         strict_ns_domain=DefaultCookiePolicy.DomainStrict)
         self._opener = build_opener(HTTPCookieProcessor(CookieJar(policy)))
 
@@ -41,7 +42,7 @@ class RESTfulClient:
     def base_url(self, url):
         self._base_url = urljoin(self._base_url, url)
 
-    def request(self, method, url=None, url_args=None, qs_args=None, 
+    def request(self, method, url=None, url_args=None, qs_args=None,
                 post_args=None, json_args=None) :
 
         if url_args is not None:
@@ -52,7 +53,7 @@ class RESTfulClient:
                 base_url = self._base_url.format(**url_args)
             else:
                 base_url = None
-            
+
             if url is not None:
                 req_url  = url.format(**url_args)
         else:
@@ -61,12 +62,11 @@ class RESTfulClient:
 
         req_url = urljoin(base_url, req_url)
 
-
         if qs_args is not None:
             assert isinstance(qs_args, dict)
             req_url = urljoin(req_url,  '?' + urllib.parse.urlencode(qs_args))
 
-        assert post_args is None or json_args is None 
+        assert post_args is None or json_args is None
 
         headers = dict(self.headers)
         body    = None
@@ -79,13 +79,12 @@ class RESTfulClient:
             body = urllib.parse.urlencode(qs_args).encode('UTF-8')
 
 
-
         req = urllib.request.Request(req_url, body, headers=headers)
         req.get_method = lambda : method.upper()
 
         self._request = req
 
-        # 
+        #
         try :
             res = self._opener.open(self._request)
             data = self.decode_data(res)
@@ -96,6 +95,19 @@ class RESTfulClient:
             data = self.decode_data(ex)
             data = data[0]
 
+            
+            errmsg = "HTTP ERROR(%d): %s\n"
+            errmsg += "Request: %s handled by %s\n"
+            errmsg += 'Caught Exception %s : %s\n'
+            errmsg %= (data['status_code'], ex.reason,
+                        req_url, data['handler'],
+                        data['exception'], data['message'])
+
+            errmsg += '\n'.join(["    at %s\n        %s"
+                                    % (ln['at'], ln['code'])
+                                        for ln in data['traceback']])
+            self.logger.error(errmsg, exc_info=ex)
+
             if res.status == 401 :
                 raise UnauthorizedError(data['message']) from ex
 
@@ -105,22 +117,24 @@ class RESTfulClient:
             elif res.status == 409 :
                 raise BusinessLogicError(data['message']) from ex
 
-            raise        
+            raise ex
 
-    def get(self, url=None, url_args=None, qs_args=None, 
-            post_args=None, json_args=None):
-        
+    def get(self, url=None, url_args=None, qs_args=None,
+                    post_args=None, json_args=None):
+
         self.request('GET', url, url_args, qs_args, post_args, json_args)
 
-    def post(self, url=None, url_args=None, qs_args=None, 
-            post_args=None, json_args=None):
-        
+    def post(self, url=None, url_args=None, qs_args=None,
+                    post_args=None, json_args=None):
+
         self.request('POST', url, url_args, qs_args, post_args, json_args)
 
-    def put(self, url=None, url_args=None, qs_args=None, post_args=None, json_args=None):
+    def put(self, url=None, url_args=None, qs_args=None,
+                    post_args=None, json_args=None):
         self.request('PUT', url, url_args, qs_args, post_args, json_args)
 
-    def delete(self, url=None, url_args=None, qs_args=None, post_args=None, json_args=None):
+    def delete(self, url=None, url_args=None, qs_args=None,
+                    post_args=None, json_args=None):
         self.request('DELETE', url, url_args, qs_args, post_args, json_args)
 
     @property
@@ -131,7 +145,7 @@ class RESTfulClient:
     @staticmethod
     def decode_data(response):
         data = response.read()
-         
+
         headers = response.headers
         content_type = headers.get_content_type()
         charset = headers.get_content_charset()
@@ -141,12 +155,12 @@ class RESTfulClient:
         if content_type == 'application/json':
             data = _json.loads(data.decode(charset))
         elif content_type == 'text/plain':
-            data = self._data.decode(charset)
+            data = data.decode(charset)
 
         return data
 
     class Response:
-        
+
         def __init__(self, response, data):
             self._response = response
             self._data = data
@@ -154,7 +168,7 @@ class RESTfulClient:
         @property
         def status(self):
             return self._response.status
-        
+
         @property
         def reason(self):
             return self._response.reason
@@ -166,6 +180,13 @@ class RESTfulClient:
         @property
         def data(self):
             return self._data
+
+    @property
+    def logger(self):
+        if hasattr(self, '_logger'):
+            return self._logger
+        self._logger = logging.getLogger('restcli')
+        return self._logger
 
 
 _restcli_pillar_class = pillar_class(RESTfulClient)
@@ -179,12 +200,12 @@ def rest_client(*args, base_url=None):
 
     @rest_client(base_url='http://localhost:9999')
     def test_hello():
-        
+
         restcli.get('api/v1')
 
         .....
     """
-    
+
     def _decorator(func):
         def wrapper(*args, **kwargs):
 
@@ -193,18 +214,17 @@ def rest_client(*args, base_url=None):
 
             client = RESTfulClient(base_url=base_url)
 
-            bound_func = _pillar_history.bound(func, 
+            bound_func = _pillar_history.bound(func,
                                         [(restcli, client)], exit_callback)
 
             ret = bound_func(*args, **kwargs)
             return ret
-            
+
         functools.update_wrapper(wrapper, func)
 
         return wrapper
-    
-    if len(args) == 1 and callable(args[0]): 
+
+    if len(args) == 1 and callable(args[0]):
         return _decorator(*args) # decorator without arguments @http_client
     else:
         return _decorator # decorator with argument @http_client()
-
