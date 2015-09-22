@@ -16,7 +16,8 @@ setup(
     packages=find_packages("src"),
     package_dir = {"": "src"},
     zip_safe = False,
-    install_requires = ["tornado>=4.2"],
+    install_requires = ["tornado>=4.2",
+                        "arrow>=0.6"],
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",

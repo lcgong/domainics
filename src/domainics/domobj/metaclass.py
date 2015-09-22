@@ -6,7 +6,10 @@ from collections import namedtuple
 from collections.abc import Iterable
 from typing import TypeVar, Mapping, Generic
 
+from datetime import datetime, date
+# from dateutil.parser import parse as datetime_parse
 
+import arrow
 
 # _primary_key_class_tmpl = """\
 # class PK:
@@ -257,7 +260,14 @@ def cast_attr_value(attrname, val, attr_type):
         return val
 
     try:
-        return attr_type(val)
+        if isinstance(val, str) and issubclass(attr_type, (datetime, date)):
+            val = arrow.get(val).datetime
+            if issubclass(attr_type, date):
+                return val.date()
+            else:
+                return val
+        else:
+            return attr_type(val)
     except (ValueError, TypeError) as ex:
         err = "The attribute '%s' should be \'%s\' type, not '%s'"
         err %= (attrname, attr_type.__name__, type(val).__name__)
