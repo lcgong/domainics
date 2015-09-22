@@ -6,7 +6,7 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 from itertools import chain as iter_chain
 
-from ..domobj import dset, dobject
+from ..domobj import dset, dobject, reshape
 from .dtable import json_object, dtable, dsequence
 
 from .sqlblock import dbc
@@ -210,12 +210,12 @@ def pq_dtable_merge(current, past):
 
         dbc << [k for k in ddel.pkey_values]
 
-def dmerge(current, past=None):
+def dmerge(current, origin=None):
     """
-    Merge the current change of object into the past.
-    
+    Merge the current change of object into the origin.
+
     """
-    if current is None and past is None:
+    if current is None and origin is None:
         return
 
     if current is not None and not isinstance(current, dset):
@@ -228,22 +228,50 @@ def dmerge(current, past=None):
         dos.add(current)
         current = dos
 
-    if past is not None and not isinstance(past, dset):
-        if not isinstance(current, dobject):
-            err = 'The past object should be dobject or dset type: %s'
-            err %= past.__class__.__name__
+    if origin is not None and not isinstance(origin, dset):
+        if not isinstance(origin, dobject):
+            err = 'The origin object should be dobject or dset type: %s'
+            err %= origin.__class__.__name__
             raise TypeError(err)
 
-        dos = dset(item_type=past.__class__)
-        dos.add(past)
-        past = dos
+        dos = dset(item_type=origin.__class__)
+        dos.add(origin)
+        origin = dos
 
     if current is None:
-        current = dset(item_type=past.item_type)
+        current = dset(item_type=origin.item_type)
 
-    if past is None:
-        past = dset(item_type=current.item_type)
+    if origin is None:
+        origin = dset(item_type=current.item_type)
 
 
     if dbc.dbtype == 'postgres':
-        pq_dtable_merge(current, past)
+        pq_dtable_merge(current, origin)
+
+
+def drecall(obj):
+    """
+    Recall the original version of the object from database.
+    """
+
+    obj_cls = obj.__class__
+    col_names = tuple(iter_chain(obj_cls.__primary_key__, obj.__value_attrs__))
+
+    sql = "SELECT " + ','.join(col_names) + " FROM "
+    sql += obj.__class__.__name__ + " WHERE "
+    sql += ' AND '.join( pk_colname + "=%s"
+                            for pk_colname in obj_cls.__primary_key__)
+
+    pk_values = []
+    for val in obj.__primary_key__:
+        # if isinstance(val, dsequence):
+        #     pk_values.append(val.value)
+        # else:
+        pk_values.append(val)
+
+    dbc << sql << tuple(pk_values)
+    origin = next(dbc)
+    if origin:
+        return obj.__class__(reshape(origin))
+    else:
+        return None
