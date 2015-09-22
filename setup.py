@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-# -*- coding: utf-8 -*- 
+# -*- coding: utf-8 -*-
 
 from distutils.core import setup
 from setuptools import find_packages
@@ -7,9 +7,9 @@ from setuptools import find_packages
 
 setup(
     name='domainics',
-    version='0.2.1',
+    version='0.3.0',
     license="BSD",
-    description='Web Framwork with Domain-Orieted architecure',
+    description='Web Framwork with Domain-orieted architecure',
     author='Chenggong Lyu',
     author_email='lcgong@gmail.com',
     url='https://github.com/lcgong/domainics',
@@ -26,8 +26,8 @@ setup(
         "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: Implementation :: CPython",
         "Topic :: Utilities",
-        ],      
+        ],
     )
