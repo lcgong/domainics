@@ -237,10 +237,7 @@ class DObjectMetaClass(type):
             else:
                 value_attrs[attr.name] = attr
 
-
         cls = type.__new__(metacls, classname, bases, class_dict)
-
-
 
         setattr(cls, '__primary_key_class__',
                                         namedtuple('PK', pkey_attrs.keys()))

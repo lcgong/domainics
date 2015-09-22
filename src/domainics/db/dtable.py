@@ -26,10 +26,14 @@ class DBArray(dset):
 
     @classmethod
     def __setter_filter__(cls, value):
+        if value is None:
+            return None
+            
         if issubclass(value.__class__, (list,)):
             return value
 
-        raise ValueError("the value should be \'list\'")
+        raise ValueError("the value should be list: %s" %
+                                                value.__class__.__name__)
 
 
 def array(item_type, iterable=None, dimensions=1, doc=None):

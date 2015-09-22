@@ -214,7 +214,7 @@ class ReshapeOperator:
                     selected_attrs[attr_name] = attr
 
         from ._dobject import dobject
-        if isinstance(self.source, dobject):
+        if isinstance(self.source, (dobject, NamedDict)):
             for attr_name, attr in selected_attrs.items():
                 if hasattr(self.source, attr_name):
                     attr_val = getattr(self.source, attr_name)

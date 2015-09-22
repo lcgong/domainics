@@ -11,9 +11,12 @@ from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
-from ..domobj import dset, dobject
+from ..domobj import dset, dobject, reshape
+from ..domobj.metaclass import DSet, DObject
 from ..error  import AuthenticationError
 from .. import json as _json
+
+from typing import Any
 
 from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
@@ -121,28 +124,16 @@ class BaseFuncRequestHandler(RequestHandler):
 
         return None
 
-    def parse_arguments(self, args, kwargs):
+    def parse_arguments(self, func_sig, args, kwargs):
         arguments = OrderedDict()
-        func_sig = inspect.signature(self.handler_func)
+
         for arg_name, arg_spec in func_sig.parameters.items():
+
             if 'json_arg' == arg_name:
                 # get json argument from body of http message
                 arg_val = self._read_json_object()
 
-            elif arg_spec.annotation != inspect._empty:
-                ann = arg_spec.annotation
-                if ann.__origin__ == DSet[Any].__origin__:
-                    arg_val = dset(arg_type, self._read_json_object())
-
-                elif issubclass(ann, DObject):
-                    arg_val = arg_type(reshape(self._read_json_object()))
-
-                else:
-                    errmsg = "Unknow type hinting: %s"
-                    errmsg %= arg_sepc
-                    raise ValueError(errmsg)
-
-            elif arg_name in self.req_path_args.items():
+            elif arg_name in self.req_path_args:
                 # get argument value from path arguments
                 arg_type = self.req_path_args[arg_name]
                 arg_val = kwargs[arg_name]
@@ -154,6 +145,27 @@ class BaseFuncRequestHandler(RequestHandler):
                 arg_val = self.get_argument(arg_name, None)
                 if arg_type != str and arg_val is not None:
                     arg_val = arg_type(arg_val)
+
+            elif arg_spec.annotation != inspect._empty:
+
+                ann = arg_spec.annotation
+                if hasattr(ann, '__origin__'): # maybe DSet[DObject]
+                    if ann.__origin__ == DSet[Any].__origin__:
+                        if len(ann.__parameters__) != 1:
+                            errmsg = ("Argument %s's type is required "
+                                       "like DSet[T]")
+                            errmsg %= arg_name
+                            raise TypeError(errmsg)
+                        item_type = ann.__parameters__[0]
+                        arg_val = dset(item_type, self._read_json_object())
+
+                elif issubclass(ann, DObject):
+                    arg_val = ann(reshape(self._read_json_object()))
+                else:
+                    errmsg = "Unknow type hinting: %s"
+                    errmsg %= arg_sepc
+                    raise ValueError(errmsg)
+
             else:
                 if arg_spec.default is inspect._empty :
                     arg_val = None
@@ -167,8 +179,9 @@ class BaseFuncRequestHandler(RequestHandler):
 
     def do_handler_func(self, *args, **kwargs) :
 
-        arguments = self.parse_arguments(args, kwargs)
-        print(arguments)
+        func_sig = inspect.signature(self.handler_func)
+
+        arguments = self.parse_arguments(func_sig, args, kwargs)
 
         self._handler_args = arguments
 
@@ -183,7 +196,17 @@ class BaseFuncRequestHandler(RequestHandler):
                                            (_busilogic_pillar, busilogic_layer)],
                                            exit_callback)
 
-        return bound_func(**arguments)
+        result = bound_func(**arguments)
+
+        # use type hinting
+        ret_type = func_sig.return_annotation
+        if result is not None and ret_type != inspect._empty:
+            if ret_type == result.__class__ :
+                return result
+            else:
+                return ret_type(reshape(result))
+
+        return result
 
 
 class RESTFuncRequestHandler(BaseFuncRequestHandler):

@@ -6,7 +6,7 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 from itertools import chain as iter_chain
 
-from ..domobj import dset
+from ..domobj import dset, dobject
 from .dtable import json_object, dtable, dsequence
 
 from .sqlblock import dbc
@@ -19,36 +19,6 @@ def _dtable_diff(current, past=None):
 
     The delta information is a tuple, the data is added, changged and removed.
     """
-    if current is None and past is None:
-        return
-
-    if current is not None and not isinstance(current, dset):
-        if not isinstance(current, dobject):
-            err = 'The current object should be dobject or dset type: %s'
-            err %= current.__class__.__name__
-            raise TypeError(err)
-
-        dos = dset(item_type=current.__class__)
-        dos.append(current)
-        current = dos
-
-    if past is not None and not isinstance(past, dset):
-        if not isinstance(current, dobject):
-            err = 'The past object should be dobject or dset type: %s'
-            err %= past.__class__.__name__
-            raise TypeError(err)
-
-        dos = dset(item_type=past.__class__)
-        dos.append(past)
-        past = dos
-
-    if current is None:
-        current = dset(item_type=past.item_type)
-
-    if past is None:
-        past = dset(item_type=current.item_type)
-
-
 
     inslst = [] # [obj] the objects to be inserted
     dellst = [] # [objid] the objid to be deleted
@@ -241,5 +211,39 @@ def pq_dtable_merge(current, past):
         dbc << [k for k in ddel.pkey_values]
 
 def dmerge(current, past=None):
+    """
+    Merge the current change of object into the past.
+    
+    """
+    if current is None and past is None:
+        return
+
+    if current is not None and not isinstance(current, dset):
+        if not isinstance(current, dobject):
+            err = 'The current object should be dobject or dset type: %s'
+            err %= current.__class__.__name__
+            raise TypeError(err)
+
+        dos = dset(item_type=current.__class__)
+        dos.add(current)
+        current = dos
+
+    if past is not None and not isinstance(past, dset):
+        if not isinstance(current, dobject):
+            err = 'The past object should be dobject or dset type: %s'
+            err %= past.__class__.__name__
+            raise TypeError(err)
+
+        dos = dset(item_type=past.__class__)
+        dos.add(past)
+        past = dos
+
+    if current is None:
+        current = dset(item_type=past.item_type)
+
+    if past is None:
+        past = dset(item_type=current.item_type)
+
+
     if dbc.dbtype == 'postgres':
         pq_dtable_merge(current, past)

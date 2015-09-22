@@ -20,7 +20,7 @@ def iter_submodules(root_module, recursive=True):
 
     if not hasattr(root_module, '__path__'):
         yield root_module
-        return    
+        return
 
     if isinstance(root_module.__path__, list): # no namespace package
         yield root_module
@@ -85,7 +85,7 @@ def filter_traceback(tb, excludes=None):
     return tb_list
 
 
-class NamedDict:
+class NamedDict():
     pass
 
 _nameddict_class_tmpl = """
@@ -93,7 +93,7 @@ class {typename}(NamedDict):
     __fields__ = {field_names!r}
 
     def __init__(self, {arg_list}):
-        self.__dict__.update((k, v) for k, v in zip(self.__fields__, [{arg_list}]))     
+        self.__dict__.update((k, v) for k, v in zip(self.__fields__, [{arg_list}]))
 
     def __repr__(self):
         expr = ','.join(['%s=%r' % (k, getattr(self, k)) for k in self.__fields__])
@@ -113,7 +113,7 @@ class {typename}(NamedDict):
     #     return _OrderedDict(zip(self.__fields__, self))
 def nameddict(typename, field_names):
     """ """
-    
+
     if isinstance(field_names, str):
         field_names = field_names.replace(',', ' ').split()
     field_names = list(map(str, field_names))
@@ -143,8 +143,8 @@ def nameddict(typename, field_names):
         arg_list    = ','.join(field_names),
     )
 
-    namespace = dict(__name__='nameddict_%s' % typename, 
-        _OrderedDict=_OrderedDict, 
+    namespace = dict(__name__='nameddict_%s' % typename,
+        _OrderedDict=_OrderedDict,
         NamedDict=NamedDict)
     exec(class_definition, namespace)
     result = namespace[typename]
@@ -182,16 +182,16 @@ class ContentTree:
             children = self._children[parent]
         except KeyError:
             self._children[parent] = children = []
-        
-        insort_left(children, point)   
+
+        insort_left(children, point)
 
     def unset(self, point):
-        """unset the point from tree, remove content and its parent's edge. 
-        The point can not be unseted if its' child points exits. 
+        """unset the point from tree, remove content and its parent's edge.
+        The point can not be unseted if its' child points exits.
         """
 
         if self._children.get(point):
-            errmsg = 'point %r has %d children, cannot unset it' 
+            errmsg = 'point %r has %d children, cannot unset it'
             errmsg %= (point, len(self._children.get(point)))
             raise ValueError(errmsg)
 
@@ -223,4 +223,3 @@ class ContentTree:
                 break
             yield parent
             point = parent
-
