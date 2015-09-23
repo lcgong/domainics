@@ -6,6 +6,7 @@ import re
 import inspect
 import types
 import datetime
+import functools
 from collections import namedtuple, OrderedDict
 from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
@@ -29,29 +30,19 @@ def route_base(rule_base, method=None, qargs=None):
     route_table.qargs  = qargs
 
 
-    # if methods is not None:
-    #     for elem in _arg_elem_or_list(methods.upper()):
-    #         routes.default_methods.append(elem)
-
-    # if path is not None:
-    #     routes.base_path.append(path)
-
-    # if proto is not None:
-    #     proto = proto.upper()
-    #     assert proto.upper() in ('REST'), 'not supported protocols: ' + proto
-    #     routes.default_proto = proto
-
-def rest_route(rule, method=None, qargs=None):
+def service(path, method=None, qargs=None):
     """
     :param method: GET/POST/PUT/DELETE
     """
     def route_decorator(func):
         route_table = _get_route_table(func)
-        route_table.set_rule(rule, qargs, method, func, None, 'REST')
+        route_table.set_rule(path, qargs, method, func, None, 'REST')
 
         return func
 
     return route_decorator
+
+rest_route = service
 
 def http_route(rule, method=None, qargs=None):
     """
@@ -96,6 +87,8 @@ class ModuleRouteTable:
 
             methods = comma_split(spec.method if spec.method else self.method)
             proto   = spec.proto if spec.proto else self.proto
+
+            print(spec.handler)
 
             handler_cls = _make_handler_class(spec.handler,
                                               spec.proto,
@@ -236,24 +229,40 @@ def _parse_route_rule(rule):
     return pattern, dict(factories)
 
 
-def _make_handler_class(func, proto, methods, pargs, qargs):
+def _make_handler_class(service_func, proto, methods, pargs, qargs):
+
+    if not inspect.isfunction(service_func):
+        errmsg = "The service function '%s' in '%s' should be a function"
+        errmsg %= (service_func.__name__, service_module.__name__)
+        raise TypeError(errmsg)
+
+    service_module = inspect.getmodule(service_func)
+    try:
+        # To be decorated-order irrevalent!!!
+        # There are decorators will decorator this function laterly.
+        # To make these decorators available, refresh these service function
+        service_func = getattr(service_module, service_func.__name__)
+    except AttributeError as ex:
+        errmsg = "Could not find '%s' service function in module '%s'. "
+        errmsg %= (service_func.__name__, service_module.__name__)
+        errmsg += "The function or its name shoule be declared in module."
+        raise AttributeError(errmsg)
+
 
     attrs = dict(
-        # func is function that has no 'self' parameter
-        handler_func    = staticmethod(func),
-        handler_name    = func.__module__ + '.' + func.__name__,
+        # service_func is function that has no 'self' parameter
+        handler_func    = staticmethod(service_func),
+        handler_name    = service_module.__name__ + '.' + service_func.__name__,
         req_path_args   = pargs,
         req_query_args  = qargs
         )
-
-
 
     if proto == 'REST':
         base_class = RESTFuncRequestHandler
     elif proto == 'HTTP':
         base_class = BaseFuncRequestHandler
 
-    cls = type(func.__name__ + '_handler', (base_class,), attrs)
+    cls = type(service_func.__name__ + '_handler', (base_class,), attrs)
     for m in methods:
         setattr(cls, m.lower(), cls.do_handler_func)
 
