@@ -91,31 +91,41 @@ class RESTfulClient:
             self._response = RESTfulClient.Response(res, data)
             return self._response
         except urllib.error.HTTPError as ex:
-            res = ex
-            data = self.decode_data(ex)
-            data = data[0]
 
-            
-            errmsg = "HTTP ERROR(%d): %s\n"
-            errmsg += "Request: %s handled by %s\n"
-            errmsg += 'Caught Exception %s : %s\n'
-            errmsg %= (data['status_code'], ex.reason,
-                        req_url, data['handler'],
-                        data['exception'], data['message'])
+            if ex.headers.get_content_type() == 'application/json':
+                res = ex
+                data = self.decode_data(ex)
+                data = data[0]
 
-            errmsg += '\n'.join(["    at %s\n        %s"
-                                    % (ln['at'], ln['code'])
-                                        for ln in data['traceback']])
-            self.logger.error(errmsg, exc_info=ex)
+                errmsg = "HTTP ERROR(%d): %s\n"
+                errmsg += "Request: %s handled by %s\n"
+                errmsg += 'Caught Exception %s : %s\n'
+                errmsg %= (data['status_code'], ex.reason,
+                            req_url, data['handler'],
+                            data['exception'], data['message'])
 
-            if res.status == 401 :
-                raise UnauthorizedError(data['message']) from ex
+                errmsg += '\n'.join(["    at %s\n        %s"
+                                        % (ln['at'], ln['code'])
+                                            for ln in data['traceback']])
+                self.logger.error(errmsg, exc_info=ex)
 
-            elif res.status == 403 :
-                raise UnauthorizedError(data['message']) from ex
+                if ex.status == 401 :
+                    raise UnauthorizedError(data['message']) from ex
 
-            elif res.status == 409 :
-                raise BusinessLogicError(data['message']) from ex
+                elif ex.status == 403 :
+                    raise UnauthorizedError(data['message']) from ex
+
+                elif ex.status == 409 :
+                    raise BusinessLogicError(data['message']) from ex
+            else:
+                charset = ex.headers.get_content_charset()
+                if charset is None:
+                    charset = "UTF-8"
+
+                data = ex.read().decode(charset)
+                errmsg = "HTTP ERROR(%d): %s\nRequest: %s\n%s"
+                errmsg %= (ex.status, ex.reason, ex.geturl(), data)
+                self.logger.error(errmsg, exc_info=ex)
 
             raise ex
 
