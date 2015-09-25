@@ -16,6 +16,8 @@ from ..domobj import dset, dobject
 from ..error  import AuthenticationError
 from .. import json as _json
 
+from urllib.parse import urljoin
+
 from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
 from .funchandler import BaseFuncRequestHandler, RESTFuncRequestHandler
@@ -30,78 +32,175 @@ def route_base(rule_base, method=None, qargs=None):
     route_table.qargs  = qargs
 
 
-def service(path, method=None, qargs=None):
-    """
-    :param method: GET/POST/PUT/DELETE
-    """
-    def route_decorator(func):
-        route_table = _get_route_table(func)
-        route_table.set_rule(path, qargs, method, func, None, 'REST')
+class HTTPRouteSpec():
 
-        return func
+    def __init__(self, proto):
+        self.module_name = None   # name of service module
+        self.service_name = None  # name of service function
+        self.proto = proto        # http protocol
+        self.methods = []         # http methods
+        self.path = ''            # the path of service endpoint
+        self.path_signature = OrderedDict()
+        self.path_pattern = None
+        self.handler_class = None
 
-    return route_decorator
+    def add_method(self, method):
+        self.methods.append(method)
 
-rest_route = service
+    def __call__(self, path):
+        self.path = path
 
-def http_route(rule, method=None, qargs=None):
-    """
-    :param method: GET/POST/PUT/DELETE
-    """
+        def decorator(service_func):
+            spec_table = RouteSpecTable.get_table(service_func)
+            spec_table.set_rule(self, service_func)
 
-    def route_decorator(func):
-        route_table = _get_route_table(func)
-        route_table.set_rule(rule, qargs, method, func, None, 'HTTP')
+            return service_func
 
-        return func
+        return decorator
 
-    return route_decorator
+    @property
+    def GET(self) :
+        self.methods.append('GET')
+        return self
 
+    @property
+    def POST(self) :
+        self.methods.append('POST')
+        return self
 
-class ModuleRouteTable:
-    def __init__(self, module):
-        self.module    = module
-        self.method    = set()
-        self.proto     = 'HTTP'
-        self.handlers  = OrderedDict()
-        self.rule_base = ''
+    @property
+    def PUT(self) :
+        self.methods.append('PUT')
+        return self
 
-    def set_rule(self, rule, qargs, method, handler_func, params=None, proto=None):
-        if rule in self.handlers:
-            errmsg = 'The rule %s has already set in %s '
-            errmsg %= (rule, route_table.module.__name__)
-            raise NameError(errmsg)
-        self.handlers[rule] = RouteSpec(rule, qargs, method, proto,
-                                        handler_func, params)
+    @property
+    def DELETE(self) :
+        self.methods.append('DELETE')
+        return self
 
-    def handler_specs(self):
+class RouteSpecTable:
 
-        for rule, spec in self.handlers.items():
-            route_rule     = self.rule_base + rule
-            pattern, pargs = _parse_route_rule(route_rule)
+    def __init__(self, service_module):
+        self.service_module = service_module
+        self.base_path = ''
+        self._specs = []
 
-            qargs = OrderedDict()
-            if spec.qargs is not None:
-                for arg in comma_split(spec.qargs):
-                    qargs[arg] = str
+    @staticmethod
+    def get_table(service_func):
+        """Get http route table in the module that declare the service func"""
 
-            methods = comma_split(spec.method if spec.method else self.method)
-            proto   = spec.proto if spec.proto else self.proto
+        service_module = inspect.getmodule(service_func)
+        if hasattr(service_module, '__http_route_spec_table__'):
+            return service_module._module_route_table
 
-            print(spec.handler)
+        table = RouteSpecTable(service_module)
+        setattr(service_module, '__http_route_spec_table__', table)
 
-            handler_cls = _make_handler_class(spec.handler,
-                                              spec.proto,
-                                              methods,
-                                              pargs,
-                                              qargs)
-
-            yield route_rule, pattern, handler_cls, spec.params
+        return table
 
 
+    def set_rule(self, route_spec, service_func):
 
-RouteSpec = namedtuple('RouteSpec',
-    ['rule', 'qargs', 'method', 'proto', 'handler', 'params'])
+        if not inspect.isfunction(service_func):
+            errmsg = "The service function '%s' in '%s' should be a function"
+            errmsg %= (service_func.__name__, service_module.__name__)
+            raise TypeError(errmsg)
+
+        route_spec.module_name = self.service_module.__name__
+        route_spec.service_name = service_func.__name__
+
+        route_spec.path = urljoin(self.base_path, route_spec.path)
+
+        # parse the argments in service path
+        path_pattern, path_args = _parse_route_rule(route_spec.path)
+        print(666, route_spec.path, path_pattern)
+        route_spec.path_signature = path_args
+        route_spec.path_pattern = path_pattern
+
+        self._specs.append(route_spec)
+
+    @property
+    def route_specs(self):
+        return self._specs
+
+    def setup(self):
+        # This process must be after all service function are decorated
+        for spec in self._specs:
+            spec.handler_class = self._make_handler_class(spec)
+
+    def _make_handler_class(self, route_spec):
+
+        try:
+            # make sure that decorated-order is irrevalent!!!
+            # There are decorators will decorator this function laterly.
+            # To make these decorators available, refresh these service function
+            service_func = getattr(self.service_module, route_spec.service_name)
+        except AttributeError as ex:
+            errmsg = "Could not find '%s' service function in module '%s'. "
+            errmsg %= (service_func.__name__, self.service_module.__name__)
+            errmsg += "The function or its name shoule be declared in module."
+            raise AttributeError(errmsg)
+
+        class_dict = dict(
+            # service_func is function that has no 'self' parameter
+            __module__      = route_spec.module_name,
+            service_name    = route_spec.service_name,
+            service_func    = staticmethod(service_func),
+            path_signature  = route_spec.path_signature
+            )
+
+        if route_spec.proto == 'REST':
+            base_classes = (RESTFuncRequestHandler,)
+        elif route_spec.proto == 'HTTP':
+            base_classes = (BaseFuncRequestHandler,)
+
+        class_name = route_spec.service_name + '_'
+        class_name += route_spec.proto.lower() + '_handler'
+
+        cls = type(class_name, base_classes, class_dict)
+        for m in route_spec.methods:
+            setattr(cls, m.lower(), cls.do_handler_func)
+
+        return cls
+
+
+
+class HTTPRouteSpecDecoratorFactory():
+
+    def __init__(self, proto):
+        self.proto = proto
+
+    def __call__(self, path, methods=None):
+        print(9999, path)
+        route_spec = HTTPRouteSpec(self.proto)
+        if methods:
+            for method in comma_split(methods):
+                route_spec.add_method(method)
+
+        route_spec.path = path
+        return route_spec
+
+    @property
+    def GET(self) :
+        return HTTPRouteSpec(self.proto).GET
+
+    @property
+    def POST(self) :
+        return HTTPRouteSpec(self.proto).POST
+
+    @property
+    def PUT(self) :
+        return HTTPRouteSpec(self.proto).PUT
+
+    @property
+    def DELETE(self) :
+        return HTTPRouteSpec(self.proto).DELETE
+
+
+rest = HTTPRouteSpecDecoratorFactory('REST')
+http = HTTPRouteSpecDecoratorFactory('HTTP')
+
+
 
 def _cast_arg_list(arg, filter=None):
     """cast element list arg into tuple arg
@@ -123,16 +222,16 @@ def _cast_arg_list(arg, filter=None):
 
     return tuple(args)
 
-
-def _get_route_table(obj):
-    handler_module = inspect.getmodule(obj)
-    if not hasattr(handler_module, '_module_route_table'):
-        route_table = ModuleRouteTable(handler_module)
-        setattr(handler_module, '_module_route_table', route_table)
-    else:
-        route_table = handler_module._module_route_table
-
-    return route_table
+#
+# def _get_route_table(obj):
+#     handler_module = inspect.getmodule(obj)
+#     if not hasattr(handler_module, '_module_route_table'):
+#         route_table = ModuleRouteTable(handler_module)
+#         setattr(handler_module, '_module_route_table', route_table)
+#     else:
+#         route_table = handler_module._module_route_table
+#
+#     return route_table
 
 
 _route_rule_syntax = re.compile('(\\\\*)'
@@ -200,6 +299,7 @@ def _parse_route_rule(rule):
     factories = [] # factories to create value object
     nonames   = []
     for argname, mode, conf, seg in _parse_tokens(rule):
+        print('argname=', argname)
         if mode:
             if mode in _route_rule_filters:
                 mask, in_filter, out_filter = _route_rule_filters[mode](conf)
@@ -217,7 +317,9 @@ def _parse_route_rule(rule):
                 pattern += '(?P<%s>%s)' % (argname, mask)
             factories.append((argname, out_filter))
         elif argname:
-            pattern += re.escape(argname)
+            print(argname, re.escape(argname))
+            # pattern += re.escape(argname)
+            pattern += argname
 
     # if nonames:
     #     errmsg = "These arguments should be named regex: "
@@ -227,43 +329,3 @@ def _parse_route_rule(rule):
     #     raise ValueError(errmsg)
 
     return pattern, dict(factories)
-
-
-def _make_handler_class(service_func, proto, methods, pargs, qargs):
-
-    if not inspect.isfunction(service_func):
-        errmsg = "The service function '%s' in '%s' should be a function"
-        errmsg %= (service_func.__name__, service_module.__name__)
-        raise TypeError(errmsg)
-
-    service_module = inspect.getmodule(service_func)
-    try:
-        # To be decorated-order irrevalent!!!
-        # There are decorators will decorator this function laterly.
-        # To make these decorators available, refresh these service function
-        service_func = getattr(service_module, service_func.__name__)
-    except AttributeError as ex:
-        errmsg = "Could not find '%s' service function in module '%s'. "
-        errmsg %= (service_func.__name__, service_module.__name__)
-        errmsg += "The function or its name shoule be declared in module."
-        raise AttributeError(errmsg)
-
-
-    attrs = dict(
-        # service_func is function that has no 'self' parameter
-        handler_func    = staticmethod(service_func),
-        handler_name    = service_module.__name__ + '.' + service_func.__name__,
-        req_path_args   = pargs,
-        req_query_args  = qargs
-        )
-
-    if proto == 'REST':
-        base_class = RESTFuncRequestHandler
-    elif proto == 'HTTP':
-        base_class = BaseFuncRequestHandler
-
-    cls = type(service_func.__name__ + '_handler', (base_class,), attrs)
-    for m in methods:
-        setattr(cls, m.lower(), cls.do_handler_func)
-
-    return cls

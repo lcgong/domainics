@@ -5,7 +5,8 @@ import logging
 import re
 import inspect
 import types
-import datetime
+import arrow
+from datetime import datetime, date
 from collections import namedtuple, OrderedDict
 from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
@@ -34,7 +35,7 @@ class BaseFuncRequestHandler(RequestHandler):
     def logger(self):
         if hasattr(self, '_logger'):
             return self._logger
-        self._logger = logging.getLogger(self.handler_name + '.request')
+        self._logger = logging.getLogger(self.service_name + '.handler')
         return self._logger
 
 
@@ -69,7 +70,7 @@ class BaseFuncRequestHandler(RequestHandler):
         segs = []
         for arg in kwargs:
             segs.append('%s=%r' % (arg, kwargs.get(arg, None)))
-        return self.handler_name + '(' + ', '.join(kwargs) + ') at ' + hex(id(self))
+        return self.service_name + '(' + ', '.join(kwargs) + ') at ' + hex(id(self))
 
 
     def handle_exception(self, exc_info):
@@ -129,57 +130,113 @@ class BaseFuncRequestHandler(RequestHandler):
 
         for arg_name, arg_spec in func_sig.parameters.items():
 
-            if 'json_arg' == arg_name:
-                # get json argument from body of http message
+            arg_val = None
+            ann_type = arg_spec.annotation
+
+            if arg_name in self.path_signature:
+                # get argument value from path arguments
+                arg_val = kwargs[arg_name]
+
+            elif arg_name == 'json_arg':
                 arg_val = self._read_json_object()
 
-            elif arg_name in self.req_path_args:
-                # get argument value from path arguments
-                arg_type = self.req_path_args[arg_name]
-                arg_val = kwargs[arg_name]
-                if arg_type != str and arg_val is not None:
-                    arg_val = arg_type(arg_val)
-
-            elif arg_name in self.req_query_args:
-                arg_type = self.req_query_args[arg_name]
+            else:
                 arg_val = self.get_argument(arg_name, None)
-                if arg_type != str and arg_val is not None:
-                    arg_val = arg_type(arg_val)
 
-            elif arg_spec.annotation != inspect._empty:
-
-                ann = arg_spec.annotation
-                if hasattr(ann, '__origin__'): # maybe DSet[DObject]
-                    if ann.__origin__ == DSet[Any].__origin__:
-                        if len(ann.__parameters__) != 1:
+            if ann_type != inspect._empty:
+                if hasattr(ann_type, '__origin__'): # maybe DSet[DObject]
+                    if ann_type.__origin__ == DSet[Any].__origin__:
+                        if len(ann_type.__parameters__) != 1:
                             errmsg = ("Argument %s's type is required "
                                        "like DSet[T]")
                             errmsg %= arg_name
                             raise TypeError(errmsg)
-                        item_type = ann.__parameters__[0]
-                        arg_val = dset(item_type, self._read_json_object())
 
-                elif issubclass(ann, DObject):
-                    arg_val = ann(reshape(self._read_json_object()))
+                        item_type = ann_type.__parameters__[0]
+
+                        if arg_name != 'json_arg' :
+                            arg_val = self._read_json_object()
+
+                        arg_val = dset(item_type, arg_val)
+
+                elif issubclass(ann_type, DObject):
+                    if arg_name != 'json_arg' :
+                        arg_val = self._read_json_object()
+
+                    arg_val = ann_type(reshape(arg_val))
                 else:
-                    errmsg = "Unknow type hinting: %s"
-                    errmsg %= arg_sepc
-                    raise ValueError(errmsg)
+                    if issubclass(ann_type, datetime):
+                        arg_val = arrow.get(arg_val).datetime
+
+                    elif issubclass(ann_type, date):
+                        arg_val = arrow.get(arg_val).datetime.date()
+
+                    else:
+                        arg_val = ann_type(arg_val)
 
             else:
-                if arg_spec.default is inspect._empty :
-                    arg_val = None
-                else:
-                    arg_val = param.default
+                pass
+
+            if arg_val is None and arg_spec.default is not inspect._empty :
+                arg_val = param.default
 
             arguments[arg_name] = arg_val
+
+
+            # if 'json_arg' == arg_name:
+            #     # get json argument from body of http message
+            #     arg_val = self.request.body
+            #     # arg_val = self._read_json_object()
+            #
+            # elif arg_name in self.path_signature:
+            #     # get argument value from path arguments
+            #     # arg_type = self.path_signature[arg_name]
+            #     arg_val = kwargs[arg_name]
+            #     # if arg_type != str and arg_val is not None:
+            #     #     arg_val = arg_type(arg_val)
+            #     #
+            #     # print('12', arg_name, arg_type)
+
+            # elif arg_name in self.req_query_args:
+            #     arg_type = self.req_query_args[arg_name]
+            #     arg_val = self.get_argument(arg_name, None)
+            #     if arg_type != str and arg_val is not None:
+            #         arg_val = arg_type(arg_val)
+
+            # elif arg_spec.annotation != inspect._empty:
+            #
+            #     ann = arg_spec.annotation
+            #     if hasattr(ann, '__origin__'): # maybe DSet[DObject]
+            #         if ann.__origin__ == DSet[Any].__origin__:
+            #             if len(ann.__parameters__) != 1:
+            #                 errmsg = ("Argument %s's type is required "
+            #                            "like DSet[T]")
+            #                 errmsg %= arg_name
+            #                 raise TypeError(errmsg)
+            #             item_type = ann.__parameters__[0]
+            #             arg_val = dset(item_type, self._read_json_object())
+            #
+            #     elif issubclass(ann, DObject):
+            #         arg_val = ann(reshape(self._read_json_object()))
+            #     else:
+            #         errmsg = "Unknow type hinting: %s"
+            #         errmsg %= arg_sepc
+            #         raise ValueError(errmsg)
+
+            # else:
+            #     if arg_spec.default is inspect._empty :
+            #         arg_val = None
+            #     else:
+            #         arg_val = param.default
+            #
+            # arguments[arg_name] = arg_val
 
         return arguments
 
 
     def do_handler_func(self, *args, **kwargs) :
 
-        func_sig = inspect.signature(self.handler_func)
+        func_sig = inspect.signature(self.service_func)
 
         arguments = self.parse_arguments(func_sig, args, kwargs)
 
@@ -188,13 +245,14 @@ class BaseFuncRequestHandler(RequestHandler):
         def exit_callback(exc_type, exc_val, tb):
             self._handler_args = None
 
+        busilogic_layer = BusinessLogicLayer(self.service_name,
+                                                self.principal_id)
 
-        busilogic_layer = BusinessLogicLayer(self.handler_name, self.principal_id)
-
-        bound_func = _pillar_history.bound(self.handler_func,
+        bound_func = _pillar_history.bound(self.service_func,
                                            [(_request_handler_pillar, self),
-                                           (_busilogic_pillar, busilogic_layer)],
-                                           exit_callback)
+                                            (_busilogic_pillar,
+                                             busilogic_layer)],
+                                             exit_callback)
 
         result = bound_func(**arguments)
 
@@ -231,7 +289,7 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
                     message=message,
                     exception=exc_info[0].__name__,
                     path=self.request.path,
-                    handler=self.handler_name,
+                    handler=self.service_name,
                     traceback=tb_list)
 
         self.set_status(status_code, reason=reason)

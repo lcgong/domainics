@@ -6,15 +6,15 @@ import inspect
 
 class History:
     '''object timeline history'''
-    
+
     _frames = {}
 
     def __init__(self):
-        self._start_frame = sys._getframe(1) 
+        self._start_frame = sys._getframe(1)
 
     def __getattr__(self, name):
 
-        frame = sys._getframe(1) 
+        frame = sys._getframe(1)
         while frame:
             env = self._frames.get(frame)
             if env is not None:
@@ -25,7 +25,7 @@ class History:
         raise AttributeError('no attribute: ' + name)
 
     def has_frame(self, frame):
-        return frame in self._frames 
+        return frame in self._frames
 
     def push(self, frame, name, value):
         """If frame has been stacked, ignore it"""
@@ -56,13 +56,13 @@ class History:
                 break
 
             frame = frame.f_back
-        
+
         return None
 
     def bound(self, func, bindings, exit_callback=None):
-        """ bound func with binding pillars. 
+        """ bound func with binding pillars.
         When the bounded has returned, the exit_callback will be called.
-        
+
         :param func: the bouding function
         :param bindings: a list binding variables [(pillar, value)]
         :param exit_callback: a callback function with three arguments. exit_callback(exc_type, exc_val, tb)
@@ -84,7 +84,7 @@ class History:
             finally:
                 for pillar, _ in bindings:
                     self.pop(frame, id(pillar))
-                if inspect.isgenerator(ret): 
+                if inspect.isgenerator(ret):
                     ret = self._confine_gen(bindings, ret, exit_callback)
                 else:
                     if exit_callback:
@@ -104,7 +104,7 @@ class History:
 
         def _closed_handler(exc_type, exc_val, tb):
             if closed_callback:
-                if exc_type == StopIteration: 
+                if exc_type == StopIteration:
                     return
 
                 closed_callback(exc_type, exc_val, tb)
@@ -134,23 +134,23 @@ def pillar_class(theclass, excludes=None):
 
 
     _special_func_names = [
-        '__abs__', '__add__', '__and__', '__call__', '__cmp__', '__coerce__', 
-        '__contains__', '__delitem__', '__delslice__', '__div__', '__divmod__', 
-        '__eq__', '__float__', '__floordiv__', '__ge__', '__getitem__', 
-        '__getslice__', '__gt__', '__hash__', '__hex__', 
-        '__int__', '__invert__',  '__iter__', '__le__', '__len__', 
-        '__long__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__', 
-        '__neg__', '__oct__', '__or__', '__pos__', '__pow__', '__radd__', 
-        '__rand__', '__rdiv__', '__rdivmod__', '__reduce__', '__reduce_ex__', 
-        '__repr__', '__reversed__', '__rfloorfiv__', '__rlshift__', '__rmod__', 
-        '__rmul__', '__ror__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__', 
-        '__rtruediv__', '__rxor__', '__setitem__', '__setslice__', '__sub__', 
+        '__abs__', '__add__', '__and__', '__call__', '__cmp__', '__coerce__',
+        '__contains__', '__delitem__', '__delslice__', '__div__', '__divmod__',
+        '__eq__', '__float__', '__floordiv__', '__ge__', '__getitem__',
+        '__getslice__', '__gt__', '__hash__', '__hex__',
+        '__int__', '__invert__',  '__iter__', '__le__', '__len__',
+        '__long__', '__lshift__', '__lt__', '__mod__', '__mul__', '__ne__',
+        '__neg__', '__oct__', '__or__', '__pos__', '__pow__', '__radd__',
+        '__rand__', '__rdiv__', '__rdivmod__', '__reduce__', '__reduce_ex__',
+        '__repr__', '__reversed__', '__rfloorfiv__', '__rlshift__', '__rmod__',
+        '__rmul__', '__ror__', '__rpow__', '__rrshift__', '__rshift__', '__rsub__',
+        '__rtruediv__', '__rxor__', '__setitem__', '__setslice__', '__sub__',
         '__truediv__', '__xor__', '__next__',]
 
     _special_ioptr_names = [
-        '__iadd__', '__iand__', '__idiv__', '__idivmod__', '__ifloordiv__', 
-        '__ilshift__', '__imod__', '__imul__', '__ior__', '__ipow__', '__irshift__', 
-        '__isub__', '__itruediv__', '__ixor__', 
+        '__iadd__', '__iand__', '__idiv__', '__idivmod__', '__ifloordiv__',
+        '__ilshift__', '__imod__', '__imul__', '__ior__', '__ipow__', '__irshift__',
+        '__isub__', '__itruediv__', '__ixor__',
     ]
 
     def _get_this_object(pillar, frame):
@@ -172,9 +172,9 @@ def pillar_class(theclass, excludes=None):
             if obj is None:
                 raise NoBoundObjectError('id=' + str(id(self)))
             getattr(obj, name)(*args, **kw)
-            
+
             return self
-        return optr    
+        return optr
 
     def __init__(self, _history):
         object.__setattr__(self, "_pillar_history", _history)
@@ -204,7 +204,7 @@ def pillar_class(theclass, excludes=None):
         __slots__       = ('_pillar_history',),
         __init__        = __init__,
         _this_object    = property(_this_object),
-        __getattribute__= __getattribute__, 
+        __getattribute__= __getattribute__,
         __setattr__     = __setattr__,
         __repr__        = __repr__
         )
@@ -242,7 +242,7 @@ class GeneratorClosedProxy:
         try:
             return genobj.__getattribute__('__next__')()
         except :
-            
+
             if inspect.getgeneratorstate(genobj) == 'GEN_CLOSED':
                 etype, eval, tb = sys.exc_info()
                 object.__getattribute__(self, "_closed_callback")(etype, eval, tb)
@@ -252,12 +252,12 @@ class GeneratorClosedProxy:
     def __del__(self):
         obj = object.__getattribute__(self, "_gen_obj")
         if hasattr(obj, '__del__'):
-            getattr(obj, '__del__')()    
-        
-        etype, eval, tb = sys.exc_info()
-        object.__getattribute__(self, "_closed_callback")(etype, eval, tb)        
+            getattr(obj, '__del__')()
 
-    
+        etype, eval, tb = sys.exc_info()
+        object.__getattribute__(self, "_closed_callback")(etype, eval, tb)
+
+
     def __delattr__(self, name):
         delattr(object.__getattribute__(self, "_gen_obj"), name)
 
@@ -269,57 +269,56 @@ class GeneratorClosedProxy:
         val = obj.__getattribute__('__iter__')()
         assert obj == val
         return self
-  
+
     def __doc__(self) :
         obj = object.__getattribute__(self, "_gen_obj")
         return obj.__getattribute__('__doc__')
 
     def __repr__(self):
         obj = object.__getattribute__(self, "_gen_obj")
-        return '<proxy %r at 0x%x>' % (obj, id(self)) 
+        return '<proxy %r at 0x%x>' % (obj, id(self))
 
     def __hash__(self):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__hash__')()       
+        return obj.__getattribute__('__hash__')()
 
     def __format__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__format__')(*args, **kwargs)       
+        return obj.__getattribute__('__format__')(*args, **kwargs)
 
     def __reduce__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__reduce__')(*args, **kwargs)   
+        return obj.__getattribute__('__reduce__')(*args, **kwargs)
 
     def __reduce_ex__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__reduce_ex__')(*args, **kwargs)           
+        return obj.__getattribute__('__reduce_ex__')(*args, **kwargs)
 
     def __eq__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__eq__')(*args, **kwargs)           
+        return obj.__getattribute__('__eq__')(*args, **kwargs)
 
     def __ne__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__ne__')(*args, **kwargs)           
+        return obj.__getattribute__('__ne__')(*args, **kwargs)
 
     def __gt__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__gt__')(*args, **kwargs)           
+        return obj.__getattribute__('__gt__')(*args, **kwargs)
 
     def __ge__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__ge__')(*args, **kwargs)           
+        return obj.__getattribute__('__ge__')(*args, **kwargs)
 
     def __le__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__le__')(*args, **kwargs)           
+        return obj.__getattribute__('__le__')(*args, **kwargs)
 
     def __lt__(self, *args, **kwargs):
         obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__lt__')(*args, **kwargs)           
+        return obj.__getattribute__('__lt__')(*args, **kwargs)
 
 
 
 
 _pillar_history = History()
-

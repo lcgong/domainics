@@ -9,7 +9,7 @@ from itertools import chain as iter_chain
 from abc import abstractmethod
 
 from ..util     import nameddict   as _nameddict
-from ..pillar   import _pillar_history, pillar_class, PillarError
+from ..pillar   import _pillar_history, pillar_class, PillarError, History
 from ..domobj   import dobject
 
 _dsn_class = {}
@@ -236,9 +236,9 @@ def _new_dobject(dobj_cls, attr_pairs):
 _default_record_type = record_plainobj
 
 
-
 _SQLPillar = pillar_class(BaseSQLBlock, excludes=['__enter__', '__exit__'])
 dbc = _SQLPillar(_pillar_history)
+
 
 def transaction(*d_args, dsn='DEFAULT', autocommit=False):
     """ 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
@@ -273,9 +273,6 @@ def transaction(*d_args, dsn='DEFAULT', autocommit=False):
 
                 sqlblk.__enter__()
                 ret = bound_func(*args, **kwargs)
-
-                print('123', ret)
-
 
                 if hasattr(ret, '_pillar_history'):
                     raise PillarError('sql block cannot return a pillar object')

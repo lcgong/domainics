@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import tornado.ioloop
 import tornado.web
 import signal
@@ -21,6 +22,10 @@ class ApplicationServerProcess(multiprocessing.Process):
 
         super(ApplicationServerProcess, self).__init__()
 
+    @property
+    def logger(self):
+        return logging.getLogger('server')
+
     def start(self, async=False):
         super(ApplicationServerProcess, self).start()
 
@@ -40,8 +45,7 @@ class ApplicationServerProcess(multiprocessing.Process):
             from tornado.httpserver import HTTPServer
             http_server = HTTPServer(self.application)
             http_server.listen(self.port, address=self.host)
-            logger = logging.getLogger('tornado.general')
-            logger.info('Application Server is Ready: ' +  self.home_url)
+            self.logger.info('Application Server is Ready: ' +  self.home_url)
 
             def ready():
                 self.is_starting_event.set()
@@ -56,8 +60,8 @@ class ApplicationServerProcess(multiprocessing.Process):
     def stop(self):
         self.terminate()
         self.join()
-        logger = logging.getLogger('tornado.general')
-        logger.info('Server (%s) was down' % self.home_url)
+
+        self.logger.info('Server (%s) was down' % self.home_url)
         self.application = None
 
 def _get_unused_socket_port():

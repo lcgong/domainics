@@ -17,7 +17,7 @@ route_base(path='/abc', proto='REST')
 def hi(sid, page):
     handler.set_header('Content-Type', 'text/plain')
 
-    handler.write("Hello, world, sid=%s, page=%s\n" % (sid, page))  
+    handler.write("Hello, world, sid=%s, page=%s\n" % (sid, page))
     for r in get_list():
     	handler.write("row: %r\n" % r)
 

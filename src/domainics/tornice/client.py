@@ -89,7 +89,7 @@ class RESTfulClient:
             res = self._opener.open(self._request)
             data = self.decode_data(res)
             self._response = RESTfulClient.Response(res, data)
-            return self._response
+            return self._response.data
         except urllib.error.HTTPError as ex:
 
             if ex.headers.get_content_type() == 'application/json':
@@ -132,20 +132,21 @@ class RESTfulClient:
     def get(self, url=None, url_args=None, qs_args=None,
                     post_args=None, json_args=None):
 
-        self.request('GET', url, url_args, qs_args, post_args, json_args)
+        return self.request('GET', url, url_args, qs_args, post_args, json_args)
 
     def post(self, url=None, url_args=None, qs_args=None,
                     post_args=None, json_args=None):
 
-        self.request('POST', url, url_args, qs_args, post_args, json_args)
+        return self.request('POST', url, url_args, qs_args, post_args, json_args)
 
     def put(self, url=None, url_args=None, qs_args=None,
                     post_args=None, json_args=None):
-        self.request('PUT', url, url_args, qs_args, post_args, json_args)
+        return self.request('PUT', url, url_args, qs_args, post_args, json_args)
 
     def delete(self, url=None, url_args=None, qs_args=None,
                     post_args=None, json_args=None):
-        self.request('DELETE', url, url_args, qs_args, post_args, json_args)
+        return self.request('DELETE', url, url_args, qs_args,
+                                post_args, json_args)
 
     @property
     def response(self):
