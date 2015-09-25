@@ -6,34 +6,103 @@ from decimal import Decimal
 from itertools import chain as iter_chain
 
 from ..util import NamedDict
-from .metaclass import DObjectMetaClass, datt, daggregate, AggregateAttr
+from .typing import DAttribute
 
-def reshape(source, *operands, **kwoperands):
-    """Reshape a domain object into a new domain object.
+"""
 
-    Two mode:
-    reshape(dobject_class, ...)  :
-    reshape(dobject_object, ...) :
+Rehape dobject type:
 
-    Option arguments:
-    _ignore :
-    _primary_key :
-    _base : base classes
-    _name : a new classes name
+    Select the required attributes:
 
-    Attributes required
-    reshape(source_object, 'attr_name1', attr2, attr3=True)
+        A._re('a', 'b', ...)
+        A._re(a=True)
 
-    Attributes ignored:
-    reshape(source_object, ignored_attr1=False, ignored_attr2=False)
-    reshape(source_object, ignore=('ignored_attr1', ignored_attr2))
-    """
+    # Add or replace attribute declaration
 
-    operator = ReshapeOperator(source, operands, kwoperands)
-    if isinstance(source, type):
-        return operator.reshape_class()
-    else:
-        return operator
+        A._re(c=datt(...), ...)
+
+    Ignore some attribute
+
+        A._re(e=False, _ignore='a')
+        A._re(e=False, _ignore=['a', 'b'])
+
+    Change the attributes of primary key:
+
+        A._re(_pkey=['a', A.d])
+
+    Change the bases
+
+        A._re(_base=B)
+        A._re(_base=[B, C])
+
+    Combine attributes from other dobject
+        A._re(_combine=[B, C])
+
+Reshape dobject object:
+
+    Cast a object in new type:
+        obj._re(A, ...)
+
+    Set value of attribute
+        obj._re(A, attr1 = val1, attr2 = val2, ...)
+        obj._re(attr1 = val1, attr2 = val2, ...)
+
+        obj.attr1 = val1  # This form cannot set primary key attribute.
+
+Empty dobject value
+
+    Importantly, the python None value does not have semantic meaning in
+    domain logics. Thus, we introduce the empty dobject concept.
+
+    bool(obj)  check whether the dobject is empty.
+"""
+
+
+# def reshape(source, *operands, **kwoperands):
+#     """Reshape a domain object into a new domain object.
+#
+#     Two mode:
+#     reshape(dobject_class, ...)  :
+#     reshape(dobject_object, ...) :
+#
+#     Option arguments:
+#     _ignore :
+#     _primary_key :
+#     _base : base classes
+#     _name : a new classes name
+#
+#     Attributes required
+#     reshape(source_object, 'attr_name1', attr2, attr3=True)
+#
+#     Attributes ignored:
+#     reshape(source_object, ignored_attr1=False, ignored_attr2=False)
+#     reshape(source_object, ignore=('ignored_attr1', ignored_attr2))
+#     """
+#
+#     operator = ReshapeOperator(source, operands, kwoperands)
+#     if isinstance(source, type):
+#         return operator.reshape_class()
+#     else:
+#         return operator
+
+class ReshapeDescriptor:
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            def op_func(*args, **kwargs):
+                return _reshape_class(owner, *args, **kwargs)
+            return op_func
+        else:
+            def op_func(*args, **kwargs):
+                return _reshape_object(instance, *args, **kwargs)
+            return op_func
+
+def _reshape_object(instance, *args, **kwargs):
+    print(222333, args, kwargs)
+
+
+def _reshape_class(instance, *args, **kwargs):
+    print(222444, args, kwargs)
 
 class ReshapeOperator:
     __slot__ = ('source', 'requred', 'ignored')
@@ -53,10 +122,10 @@ class ReshapeOperator:
         for i, arg in enumerate(operands):
             if isinstance(arg, str):
                 self.required[arg] = True
-            elif isinstance(arg, datt):
+            elif isinstance(arg, DAttribute):
                 self.required[arg.name] = True
             else:
-                errmsg = "The %dth argument should be a str or datt object: %r"
+                errmsg = "The %dth argument should be a str or DAttribute object: %r"
                 errmsg %= (i + 1, arg)
                 raise ValueError(errmsg)
 
@@ -67,14 +136,14 @@ class ReshapeOperator:
                         # _ignore=(attr1, 'attr2')
                         if isinstance(elem, str):
                             self.ignored[elem] = True
-                        elif isinstance(elem, datt):
+                        elif isinstance(elem, DAttribute):
                             self.ignored[elem.name] = elem
                         else:
                             errmsg = ("The %d-th element in 'ignore' argument "
-                                      "should be a str or datt object: %r")
+                                      "should be a str or DAttribute object: %r")
                             errmsg %= (elem, arg_value)
                             raise ValueError(errmsg)
-                elif isinstance(arg_value, datt):
+                elif isinstance(arg_value, DAttribute):
                     self.ignored[arg_value.name] = attr
                 elif isinstance(arg_value, str):
                     self.ignored[arg_value] = True
@@ -97,13 +166,13 @@ class ReshapeOperator:
                 else:
                     raise ValueError()
             elif arg == '_primary_key':
-                if isinstance(arg_value, (datt, str)):
+                if isinstance(arg_value, (DAttribute, str)):
                     self._primary_key = [arg_value]
 
                 elif isinstance(arg_value, Iterable):
                     self._primary_key = []
                     for elem in arg_value:
-                        if isinstance(elem, (datt, str)):
+                        if isinstance(elem, (DAttribute, str)):
                             self._primary_key.append(elem)
                         else:
                             raise ValueError()

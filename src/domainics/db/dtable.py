@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from ..domobj.metaclass import datt
-from ..domobj._dobject import dobject
-from ..domobj.dset import dset
-
+from ..domobj import dobject, dset, datt
 
 
 class dtable(dobject):
@@ -28,7 +25,7 @@ class DBArray(dset):
     def __setter_filter__(cls, value):
         if value is None:
             return None
-            
+
         if issubclass(value.__class__, (list,)):
             return value
 

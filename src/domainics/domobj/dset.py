@@ -2,14 +2,14 @@
 
 from collections import OrderedDict
 from collections import namedtuple
-
 from collections.abc import Iterable, Mapping
 
-from .metaclass import datt, daggregate, DSet
-from ._dobject import dobject
-from ._reshape import reshape
+# from .metaclass import datt
+# from ._reshape import reshape
 
-class dset(daggregate, DSet):
+from .typing import DObject, DSet, DAttribute
+
+class dset(DSet):
     """
     The aggregate object set of domain object.
     """
@@ -26,7 +26,7 @@ class dset(daggregate, DSet):
         self.item_type = item_type
 
         if primary_key is not None:
-            if isinstance(primary_key, datt):
+            if isinstance(primary_key, DAttribute):
                 primary_key = OrderedDict([(primary_key.name, primary_key)])
 
             elif isinstance(primary_key, str):
@@ -46,7 +46,7 @@ class dset(daggregate, DSet):
             elif isinstance(primary_key, Iterable):
                 pkeys = OrderedDict()
                 for attr in primary_key:
-                    if isinstance(attr, datt):
+                    if isinstance(attr, DAttribute):
                         pkeys[attr.name] = attr
 
                     elif isinstance(attr, str):
@@ -61,13 +61,13 @@ class dset(daggregate, DSet):
                             raise ValueError(errmsg)
                         pkeys[attr.name] = attr
                     else:
-                        raise ValueError('primary_key should be a datt, '
+                        raise ValueError('primary_key should be a DAttribute, '
                                          'str object or a collection of it')
                 primary_key = pkeys
 
             else:
-                raise TypeError('primary_key should be a datt object '
-                                'or an iterable of datt object')
+                raise TypeError('primary_key should be a DAttribute object '
+                                'or an iterable of DAttribute object')
 
             self._item_primary_key = primary_key
             self._item_primary_key_class = namedtuple('PK', (n for n in primary_key))
@@ -104,7 +104,7 @@ class dset(daggregate, DSet):
         """
         If the identity of obj has been added, replace the old one with it.
         """
-        if isinstance(obj, dobject):
+        if isinstance(obj, DObject):
             if obj.__class__ != self.item_type:
                 # reshape the object because of the different doject clasess
                 obj = self.item_type(reshape(obj))
@@ -112,7 +112,7 @@ class dset(daggregate, DSet):
             obj = self.item_type(reshape(obj)) # reshape the dict object
         else:
             errmsg = ("The aggregate object should be "
-                      "dobject or mapping object: %r")
+                      "DObject or mapping object: %r")
             errmsg %= obj
             raise TypeError(errmsg)
 
@@ -147,7 +147,7 @@ class dset(daggregate, DSet):
             pkey_obj = self._item_primary_key_class(*obj)
         elif isinstance(obj, dict):
             pkey_obj = self._item_primary_key_class(**obj)
-        elif isinstance(obj, dobject):
+        elif isinstance(obj, DObject):
             if (self._item_primary_key_class !=
                     obj.__class__.__primary_key_class__):
                 pkey_obj = self._item_primary_key_class(
@@ -157,7 +157,7 @@ class dset(daggregate, DSet):
                 pkey_obj = obj.__primary_key__
 
         else:
-            errmsg = 'The type of object should be dobject, identity or int: %s'
+            errmsg = 'The type of object should be DObject, identity or int: %s'
             errmsg %= obj.__class__.__name__
             raise TypeError(errmsg)
 
@@ -222,7 +222,7 @@ class dset(daggregate, DSet):
 
     def __getitem__(self, index):
 
-        if isinstance(index, dobject) or isinstance(index, tuple):
+        if isinstance(index, DObject) or isinstance(index, tuple):
             idx = self.index(index)
             return self.__list[idx]
 
@@ -239,7 +239,7 @@ class dset(daggregate, DSet):
 
     def __delitem__(self, index):
 
-        if isinstance(index, dobject) :
+        if isinstance(index, DObject) :
             idx = self.index(index)
             del self.__list[idx]
             del self.__map[index._dobj_id]
@@ -266,8 +266,8 @@ class dset(daggregate, DSet):
             raise TypeError(errmsg)
 
     def __setitem__(self, index, value):
-        if not isinstance(value, dobject):
-            raise TypeError('The assigned value should be dobject')
+        if not isinstance(value, DObject):
+            raise TypeError('The assigned value should be DObject')
 
         if isinstance(index, int):
             # if the identity of this indexed object is different,
@@ -282,7 +282,7 @@ class dset(daggregate, DSet):
 
             self.__list[index] = value
 
-        elif isinstance(index, dobject):
+        elif isinstance(index, DObject):
             self.__list[self.index(index) ] = value
         elif isinstance(index, slice):
             raise NotImplementedError()

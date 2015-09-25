@@ -13,7 +13,7 @@ from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject, reshape
-from ..domobj.metaclass import DSet, DObject
+from ..domobj import DSet, DObject
 from ..error  import AuthenticationError
 from .. import json as _json
 
@@ -22,8 +22,6 @@ from typing import Any
 from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
 from ..exception import UnauthorizedError, ForbiddenError, BusinessLogicError
-
-from ..domobj.metaclass import DSet, DObject
 
 _request_handler_pillar = pillar_class(RequestHandler)(_pillar_history)
 

@@ -11,9 +11,7 @@ from .dtable import dtable, dsequence
 from ..util     import iter_submodules
 
 
-from ..domobj.metaclass import datt
-from ..domobj._dobject import dobject
-from ..domobj.dset import dset
+from ..domobj import dobject, dset, datt
 
 import textwrap
 
