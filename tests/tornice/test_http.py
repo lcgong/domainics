@@ -1,26 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import decimal
-import datetime as dt
-
-
 import pytest
-
-# from domainics.tornice.route import rest, http
-
-
-import tornado.ioloop
-import tornado.web
-
-import multiprocessing
-
-from domainics.tornice import rest
-
+import decimal
 from urllib.parse import urljoin
 from datetime import date, datetime
 
 
 from domainics.domobj import DSet, DObject, dset, dobject, datt, reshape
+from domainics.tornice import rest, route_base
+from domainics.tornice.client import rest_client, restcli
+
+route_base('sys/')
 
 class A(dobject):
     sn = datt(str)
@@ -28,19 +18,16 @@ class A(dobject):
 
 AA = reshape(A, _primary_key=['sn'])
 
-@rest.GET(r'/abc/{sn:int}/{path:path}')
+@rest.GET(r'abc/{sn:int}/{path:path}')
 def hello(sn: int, name, val: float, d1: datetime, path: str, obj: DSet[AA]):
     print(8888, sn,  path, name)
     print(8888, val, d1,  obj)
     return sn
 
 
-from domainics.tornice.client import rest_client, restcli
-
 @rest_client
 def test_hi(app_url):
-
-    restcli.base_url = app_url
+    restcli.base_url = urljoin(app_url, '/api-test/v1/sys/')
 
     data = [{'sn':1021, 'name':'test-a'}]
     data = restcli.get('abc/%d/abc/ds' % 1001,
@@ -50,14 +37,3 @@ def test_hi(app_url):
                             json_args=data)
 
     print(data)
-
-
-
-
-#
-# if __name__ == '__main__':
-#     # from . import server
-#     pass
-#     # server.start()
-#     # test_hi()
-#     # server.stop()

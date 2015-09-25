@@ -7,9 +7,12 @@ import inspect
 import types
 import datetime
 import functools
+from importlib import import_module
 from collections import namedtuple, OrderedDict
 from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
+
+
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject
@@ -23,14 +26,27 @@ from ..busitier import _busilogic_pillar, BusinessLogicLayer
 from .funchandler import BaseFuncRequestHandler, RESTFuncRequestHandler
 
 
-def route_base(rule_base, method=None, qargs=None):
+def route_base(base_path):
 
     # get routes from the invoking module
-    route_table = _get_route_table(inspect.currentframe().f_back)
-    route_table.rule_base = rule_base
-    route_table.method = method
-    route_table.qargs  = qargs
+    caller_obj = inspect.currentframe().f_back
+    route_table = RouteSpecTable.get_table(caller_obj)
+    route_table._part_base_path = base_path
 
+    parent_pkgs = []
+    pkg_name = route_table.service_module.__name__.rpartition('.')[0]
+    while pkg_name:
+        parent_pkgs.append(pkg_name)
+        pkg_name = pkg_name.rpartition('.')[0]
+
+    parent_path = ''
+    for pkg_name in reversed(parent_pkgs):
+        pkg_module = import_module(pkg_name)
+        if hasattr(pkg_module, '__http_route_spec_table__'):
+            part_path = pkg_module.__http_route_spec_table__._part_base_path
+            parent_path = urljoin(parent_path, part_path)
+
+    route_table.base_path = urljoin(parent_path, base_path)
 
 class HTTPRouteSpec():
 
@@ -91,7 +107,7 @@ class RouteSpecTable:
 
         service_module = inspect.getmodule(service_func)
         if hasattr(service_module, '__http_route_spec_table__'):
-            return service_module._module_route_table
+            return service_module.__http_route_spec_table__
 
         table = RouteSpecTable(service_module)
         setattr(service_module, '__http_route_spec_table__', table)
