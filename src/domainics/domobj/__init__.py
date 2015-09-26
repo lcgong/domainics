@@ -28,11 +28,17 @@ Rehape dobject type:
         A._re(_base=[X, Y])
 
     Combine attributes from some dobjects
+        A._re(_combine=X)
         A._re(_combine=[X, Y])
 
     Substitute attribute:
 
         A._re(..., _subst=dict(attr1=attr1_new_name, ...))
+
+
+    Change the type name:
+
+        A._re(..., _name="new_type_name", ...)
 
 Reshape dobject object:
 

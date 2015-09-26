@@ -56,6 +56,9 @@ def test_equal():
     assert A(a=1, b=2, d=3) == A(a=1, b=2, d=3)
 
 def test_bool():
+
+    assert not dobject()
+    
     class A(dobject):
         pass
 

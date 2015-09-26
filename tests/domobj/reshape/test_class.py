@@ -21,19 +21,16 @@ def test_new_object():
 
         __primary_key__ = [a, b]
 
-    a1 = A(a=1, b='abc', c=123.4, d='45.67', e='2015-07-29')
-    assert a1.e == date(2015, 7, 29)
-    assert a1.d == Decimal('45.67')
+    print(A)
 
-    a2 = A(dict(a=1, b='abc', c=123.4, d='45.67', e='2015-07-29'), b='xyz')
-    assert a1 != a2
-    assert a1.a == 1 and a2.a == 1
-    assert a1.b == 'abc' and a2.b == 'xyz'
+    assert len(A._re('a').__value_attrs__) == 1
 
-    class obj1():
-        a = 10
-        b = 'xyz'
-    a3 = A(obj1())
+    with pytest.raises(ValueError) as exc:
+        A1 = A._re(_ignore=['a', 'c'], _pkey=['c', 'e']) # c conflict!
 
-    assert a3.a == 10 and a3.b == 'xyz' and a3.c is None
-    # print(a3)
+    A1 = A._re(_ignore=['a', 'c'], _pkey=['b', 'e']) # c conflict!
+
+    A2 = A._re(c=datt(date, default=date(2015,7,29)))
+    print(A.c)
+    assert A.c.type == float and A2.c.type == date
+    print(A1)

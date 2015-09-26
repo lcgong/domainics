@@ -138,11 +138,9 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         if not cls.__value_attrs__ and not cls.__primary_key__:
             return False  # no attribues defined in this dobject
 
-        print(111, self.__class__.__primary_key__)
         for attr_name, attr in iter_chain(cls.__primary_key__.items(),
                                           cls.__value_attrs__.items()):
 
-            print(222, attr_name)
             if attr_name not in self.__value_dict__:
                 continue # The truth value of attribute is false
 
