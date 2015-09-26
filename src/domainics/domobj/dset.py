@@ -12,8 +12,7 @@ from .metaclass import _make_pkey_class
 
 
 class dset(DSet):
-    """
-    The aggregate object set of domain object.
+    """The set of dobjects.
     """
 
     item_type = None
@@ -181,26 +180,6 @@ class dset(DSet):
         """export dset object in list"""
 
         return [item.export() for item in self.__list]
-
-    def __ilshift__(self, target):
-        """ x <<= y, the domain object x conforms to y """
-        for objid in list(self.__map):
-            if objid not in target.__map: # need to be deleted items
-                del self[objid]
-                continue
-
-            self[objid].__ilshift__(target[objid])
-
-        for objid in target.__map:
-            if objid in self.__map:
-                continue
-
-            # items that be inserted
-            newval = self.item_type(**dict([z for z in zip(objid._fields, objid)]) )
-            newval.__ilshift__(target[objid])
-            self.append(newval)
-
-        return self
 
     def __bool__(self):
         return bool(self.__list)

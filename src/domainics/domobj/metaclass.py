@@ -32,7 +32,7 @@ class DObjectMetaClass(type):
     def __prepare__(metacls, name, bases, **kwargs):
         return OrderedDict()
 
-    def __new__(metacls, classname, bases, class_dict):
+    def __new__(metacls, classname, bases, class_dict, **kargs):
 
         pkey_attrs = OrderedDict()
         value_attrs = OrderedDict()
@@ -117,7 +117,8 @@ class DObjectMetaClass(type):
 
         return cls
 
-
+    def __init__(cls, name, bases, namespace, **kargs):
+        super().__init__(name, bases, namespace)
 
 _pkey_class_tmpl = """\
 class {typename}(PrimaryKeyTuple[DObjectType]):

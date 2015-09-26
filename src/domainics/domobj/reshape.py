@@ -174,7 +174,10 @@ def _reshape_class(orig_cls, *args, **kwargs):
             raise ValueError(errmsg)
 
     for attr_name, arg_value in kwargs.items():
-        if isinstance(arg_value, bool):
+        if attr_name.startswith('_'):
+            raise ValueError("Unknown operation '%s'" % attr_name)
+
+        elif isinstance(arg_value, bool):
             if arg_value:
                 selected.add(arg)
             else:
@@ -193,16 +196,29 @@ def _reshape_class(orig_cls, *args, **kwargs):
     attributes = OrderedDict()
     for attr_name, attr in iter_chain(orig_cls.__primary_key__.items(),
                                       orig_cls.__value_attrs__.items()):
-            attributes[attr_name] = attr
 
-    for new_attr_name, old_attr_name in substituted.items():
-        if old_attr_name not in attributes:
+            if attr_name in substituted:
+                attributes[substituted[attr_name]] = attr
+            else:
+                attributes[attr_name] = attr
+
+    # ONLY substitute the original object's attribute names
+    for old_attr_name, new_attr_name  in substituted.items():
+
+        if (old_attr_name not in orig_cls.__value_attrs__ and
+                old_attr_name not in orig_cls.__primary_key__):
+
             errmsg = "No found the attribute '%s' substituted by '%s' in %s"
             errmsg = (old_attr_name, new_attr_name, orig_cls.__name__)
             raise ValueError(errmsg)
 
-        attributes[new_attr_name] = attributes[old_attr_name]
-        del attributes[old_attr_name] # removed the substituted attribue
+        if old_attr_name in selected:
+            selected.add(new_attr_name)
+            selected.remove(old_attr_name)
+
+        if old_attr_name in ignored:
+            ignored.add(new_attr_name)
+            ignored.remove(old_attr_name)
 
     for cls in combined:
         for attr_name, attr in iter_chain(cls.__primary_key__.items(),
@@ -214,19 +230,6 @@ def _reshape_class(orig_cls, *args, **kwargs):
     for attr_name, attr in declared.items():
         attributes[attr_name] = attr
 
-    for attr_name in new_pkeys:
-        if attr_name in ignored:
-            errmsg = ("Conflict! The attribute '%s' has specified as primary "
-                      "key, and also as ignored attribute")
-            errmsg %= attr_name
-            raise ValueError(errmsg)
-
-        if attr_name not in attributes:
-            errmsg = ("The attribute '%s' specified as primary key does not"
-                      " be declared in origin or base classes")
-            errmsg %= attr_name
-            raise ValueError(errmsg)
-
     if selected:
         attributes = OrderedDict([(k, v) for k, v in attributes.items()
                                     if k in selected and k not in ignored])
@@ -234,9 +237,42 @@ def _reshape_class(orig_cls, *args, **kwargs):
         attributes = OrderedDict([(k, v) for k, v in attributes.items()
                                     if k not in ignored])
 
+    if new_pkeys:
+        pkeys = []
+        for attr_name in new_pkeys:
+            if attr_name in ignored:
+                errmsg = ("Conflict! The attribute '%s' has specified as "
+                          "primary key, and also as ignored attribute")
+                errmsg %= attr_name
+                raise ValueError(errmsg)
+
+            if attr_name not in attributes:
+                errmsg = ("The attribute '%s' specified as primary key does not"
+                          " be declared in origin or base classes")
+                errmsg %= attr_name
+                raise ValueError(errmsg)
+
+            if attr_name in attributes:
+                pkeys.append(attr_name)
+
+        new_pkeys = pkeys
+    else:
+        if orig_cls.__primary_key__:
+            new_pkeys = []
+            for attr_name in orig_cls.__primary_key__:
+                if attr_name in substituted:
+                    attr_name = substituted[attr_name]
+
+                if attr_name not in attributes:
+                    continue
+
+                new_pkeys.append(attr_name)
+
+
 
 
     attributes['__primary_key__'] = new_pkeys
+
 
     if not new_bases:
         new_bases = orig_cls.__bases__

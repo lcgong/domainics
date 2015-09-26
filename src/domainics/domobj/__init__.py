@@ -33,7 +33,7 @@ Rehape dobject type:
 
     Substitute attribute:
 
-        A._re(..., _subst=dict(attr1=attr1_new_name, ...))
+        A._re(..., _subst=dict(orgin_attr_name_attr1=new_name, ...))
 
 
     Change the type name:
@@ -84,6 +84,40 @@ Equivalence of dobject:
     attributes are needed to be equaled if the two dobject are equaled.
 
     a == b
+
+DSet
+    A dset of dobject is a special dobject. It has also key attributes,
+    but not non-key attributes. The dset as a group of dobject in domain should
+    be better to be identified by some canonical infomation that is represented
+    by key attributes. To be clear, although the item has a key, we assume that
+    the key of item is enough to be identified in the dset domain. In bigger
+    domain, the key of item would be invalid.
+
+    When the dset object lives in a dobject, which this dset object is defined
+    by a attribute or property in *dominion* dobject. The key attributes are
+    needed to be attributes of dominion dobject. If the dominated dset is not
+    set the key, the key of dominion object is used as the key of dset.
+
+    The link between dominion object and item object ...
+
+    A(sn) -> [ B(a_sn, ln) ] (_pkey=sn)
+
+
+    dominion
+
+    # class A(dobject):
+    #     items = datt(dset(A, _key=sn, _item_key=[..], sn=A.sn),
+    #                  doc = "")
+
+
+    ASet = dset(A, _key=sn, _item_key=[..], sn=A.sn)._re(_subst=dict(sn='ssn'))
+    # sn is substituted to ssn, where the link is changed to ssn=A.sn
+    s1 = ASet([adsds], sn=123)
+
+    BSet = dset(B, _key=no, _item_key=[..], sn=A.sn)
+    s2 = BSet(s1) #
+
+
 
 
 Specicial attribues:
