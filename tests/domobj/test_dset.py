@@ -40,7 +40,7 @@ def test_dset_primary_key():
 
     # s += a_list
 
-    assert len(s._item_primary_key) == 1
+    assert len(s.__item_key__) == 1
 
     s.add(a_list[0])
 
@@ -55,7 +55,7 @@ def test_dset_primary_key():
     assert s[0].c == 3
 
 
-    s = dset(A, primary_key=[A.a, A.b])
+    s = dset(A, item_key=[A.a, A.b])
     s += a_list
     assert len(s) == 2
     assert s[0].c == 2 and s[1].c == 3

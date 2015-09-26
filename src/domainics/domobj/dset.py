@@ -8,6 +8,8 @@ from collections.abc import Iterable, Mapping
 # from ._reshape import reshape
 
 from .typing import DObject, DSet, DAttribute
+from .metaclass import _make_pkey_class
+
 
 class dset(DSet):
     """
@@ -16,7 +18,7 @@ class dset(DSet):
 
     item_type = None
 
-    def __init__(self, item_type, iterable=None, doc=None, primary_key=None):
+    def __init__(self, item_type, iterable=None, doc=None, item_key=None):
         self.__list = []
         self.__map = {}
 
@@ -25,27 +27,27 @@ class dset(DSet):
 
         self.item_type = item_type
 
-        if primary_key is not None:
-            if isinstance(primary_key, DAttribute):
-                primary_key = OrderedDict([(primary_key.name, primary_key)])
+        if item_key is not None:
+            if isinstance(item_key, DAttribute):
+                item_key = OrderedDict([(item_key.name, item_key)])
 
-            elif isinstance(primary_key, str):
-                if primary_key in item_type.__primary_key__:
-                    primary_key = [(primary_key,
-                                    item_type.__primary_key__[primary_key])]
-                    primary_key = OrderedDict(primary_key)
+            elif isinstance(item_key, str):
+                if item_key in item_type.__primary_key__:
+                    item_key = [(item_key,
+                                    item_type.__primary_key__[item_key])]
+                    item_key = OrderedDict(primary_key)
 
-                elif primary_key in item_type.__value_attrs__:
-                    primary_key = OrderedDict([(primary_key,
-                                        item_type.__value_attrs__[primary_key])])
+                elif item_key in item_type.__value_attrs__:
+                    item_key = OrderedDict([(item_key,
+                                        item_type.__value_attrs__[item_key])])
                 else:
                     errmsg = "No '%s' attribute is defined in %s"
-                    errmsg %= (primary_key, item_type.__name__)
+                    errmsg %= (item_key, item_type.__name__)
                     raise ValueError(errmsg)
 
-            elif isinstance(primary_key, Iterable):
+            elif isinstance(item_key, Iterable):
                 pkeys = OrderedDict()
-                for attr in primary_key:
+                for attr in item_key:
                     if isinstance(attr, DAttribute):
                         pkeys[attr.name] = attr
 
@@ -61,27 +63,28 @@ class dset(DSet):
                             raise ValueError(errmsg)
                         pkeys[attr.name] = attr
                     else:
-                        raise ValueError('primary_key should be a DAttribute, '
+                        raise ValueError('item_key should be a DAttribute, '
                                          'str object or a collection of it')
-                primary_key = pkeys
+                item_key = pkeys
 
             else:
-                raise TypeError('primary_key should be a DAttribute object '
+                raise TypeError('item_key should be a DAttribute object '
                                 'or an iterable of DAttribute object')
 
-            self._item_primary_key = primary_key
-            self._item_primary_key_class = namedtuple('PK', (n for n in primary_key))
+            self.__item_key__ = item_key
+            self.__item_key_class__ =  _make_pkey_class(item_type,
+                                                        attr_names=item_key)
 
         else:
-            # primary_key is not specified by inialization of dset
+            # item_key is not specified by inialization of dset
             if not item_type.__primary_key__:
-                errmsg = "primary key should be given in primary_key argument "
+                errmsg = "primary key should be given in item_key argument "
                 errmsg += " or be defined in %s class "
                 errmsg %= item_type.__name__
                 raise ValueError(errmsg)
 
-            self._item_primary_key = item_type.__primary_key__
-            self._item_primary_key_class = item_type.__primary_key_class__
+            self.__item_key__ = item_type.__primary_key__
+            self.__item_key_class__ = item_type.__primary_key_class__
 
 
 
@@ -116,8 +119,7 @@ class dset(DSet):
             errmsg %= obj
             raise TypeError(errmsg)
 
-        pkey = self._item_primary_key_class(*tuple(getattr(obj, n)
-                                        for n in self._item_primary_key.keys()))
+        pkey = self.__item_key_class__(obj)
         # pkey = obj.__primary_key__
         if not pkey:
             errmsg = "The item's identity of %s is required"
@@ -144,15 +146,15 @@ class dset(DSet):
         if isinstance(obj, int):
             raise ValueError('TBD:')
         elif isinstance(obj, tuple):
-            pkey_obj = self._item_primary_key_class(*obj)
+            pkey_obj = self.__item_key_class__(obj)
         elif isinstance(obj, dict):
-            pkey_obj = self._item_primary_key_class(**obj)
+            pkey_obj = self.__item_key_class__(**obj)
         elif isinstance(obj, DObject):
-            if (self._item_primary_key_class !=
+            if (self.__item_key_class__ !=
                     obj.__class__.__primary_key_class__):
-                pkey_obj = self._item_primary_key_class(
+                pkey_obj = self.__item_key_class__(
                     *(getattr(obj, attr_name)
-                        for attr_name in self._item_primary_key))
+                        for attr_name in self.__item_key__))
             else:
                 pkey_obj = obj.__primary_key__
 
@@ -216,7 +218,7 @@ class dset(DSet):
         s %= (self.__class__.__name__,
                 [obj for obj in self.__list],
                 self.item_type.__module__ + '.' + self.item_type.__qualname__,
-                tuple(self._item_primary_key.keys()))
+                tuple(self.__item_key__.keys()))
 
         return s
 
@@ -311,13 +313,7 @@ class dset(DSet):
     def __iadd__(self, iterable) :
 
         for obj in iterable:
-            self.append(obj)
+            self.add(obj)
 
         return self
         # operator 'o.x += a', translate into o.x = o.x.__iadd__(a)
-
-    # def reform(self, other):
-    #     self.clear()
-    #     items = (item.copy() for item in other.__list)
-    #     for item in items:
-    #         self.append(item)

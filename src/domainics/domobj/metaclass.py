@@ -3,13 +3,14 @@
 
 from collections import OrderedDict
 from collections import namedtuple
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Mapping, Generic
 
 from datetime import datetime, date
 # from dateutil.parser import parse as datetime_parse
 
-from .typing import DSet, DAttribute, DAggregate, PrimaryKeyTuple, AnyDObject
+from .typing import DSet, DObject, PrimaryKeyTuple, AnyDObject
+from .typing import DAttribute, DAggregate
 from .typing import cast_attr_value
 from .dattr import AggregateAttr
 from .reshape import ReshapeDescriptor
@@ -109,7 +110,7 @@ class DObjectMetaClass(type):
         cls = type.__new__(metacls, classname, bases, class_dict)
 
         setattr(cls, '__primary_key__', pkey_attrs)
-        setattr(cls, '__primary_key_class__', _make_pkey_tuple_class(cls))
+        setattr(cls, '__primary_key_class__', _make_pkey_class(cls))
 
         setattr(cls, '__value_attrs__', value_attrs)
         setattr(cls, '_re', ReshapeDescriptor())
@@ -122,37 +123,61 @@ _pkey_class_tmpl = """\
 class {typename}(PrimaryKeyTuple[DObjectType]):
     "Primary key value tuple"
 
+    _attr_names = tuple([{attr_names}])
+
     def __init__(self, instance):
-        self._instance = instance
-        attr_names = instance.__class__.__primary_key__.keys()
-        self._attr_values = tuple(getattr(instance, n) for n in attr_names)
+        if isinstance(instance, DObject):
+            self._instance = instance
+            self._attr_values = tuple(getattr(instance, n)
+                                        for n in self._attr_names)
+        elif isinstance(instance, tuple):
+            self._attr_values = instance
+        elif isinstance(instance, Mapping):
+            self._attr_values = tuple(instance.get(n, None)
+                                        for n in self._attr_names)
+        else:
+            errmsg = "The input value should be a dobject, tuple or dict object"
+            errmsg += ": %s" % instance.__class__.__name__
+            raise TypeError(errmsg)
 
     def __repr__(self):
-        attr_names = self._instance.__class__.__primary_key__.keys()
         expr = ', '.join(['%s=%r' % (k, v)
-                            for k, v in zip(attr_names, self._attr_values)])
-        return 'PK(' + expr + ')'
+                        for k, v in zip(self._attr_names, self._attr_values)])
+        return 'K(' + expr + ')'
 
     def __eq__(self, other):
         return self._attr_values == other._attr_values
 
     def __hash__(self):
         return hash(self._attr_values)
+
+    def __len__(self):
+        return len(self._attr_names)
 """
 _pkey_attr_tmpl="""\
     {name} = property(lambda self: self._attr_values[{idx}])
 """
 
-def _make_pkey_tuple_class(dobj_cls):
+def _make_pkey_class(dobj_cls, attr_names = None):
     """ """
 
-    typename = dobj_cls.__name__ + '_pkey_tuple'
+    typename = dobj_cls.__name__ + '_key_tuple'
 
-    class_code = _pkey_class_tmpl.format(typename=typename)
+    if attr_names is None:
+        attr_names = dobj_cls.__primary_key__
+
+    attr_names = [repr(name) for name in attr_names]
+
+    class_code = _pkey_class_tmpl.format(typename = typename,
+                                         attr_names = ', '.join(attr_names))
+
     for i, attr_name in enumerate(dobj_cls.__primary_key__):
         class_code += _pkey_attr_tmpl.format(name=attr_name, idx=i)
 
-    namespace = dict(PrimaryKeyTuple=PrimaryKeyTuple, DObjectType=dobj_cls)
+    namespace = dict(PrimaryKeyTuple = PrimaryKeyTuple,
+                     DObjectType = dobj_cls,
+                     DObject=DObject,
+                     Mapping=Mapping)
     exec(class_code, namespace)
     pkey_cls = namespace[typename]
     pkey_cls.__module__ = dobj_cls.__module__
