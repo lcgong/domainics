@@ -23,8 +23,8 @@ class DObjectMetaClass(type):
     dobject classs
 
     attrs:
-    :__primary_key__: It is a attribute dictionary of primary key of domain object
-    :__value_attrs__: It is a attribute dictionary of non primary key of domain object
+    :__dobject_key__: It is a attribute dictionary of primary key of domain object
+    :__dobject_att__: It is a attribute dictionary of non primary key of domain object
 
     """
 
@@ -37,15 +37,15 @@ class DObjectMetaClass(type):
         pkey_attrs = OrderedDict()
         value_attrs = OrderedDict()
         for base_cls in reversed(bases): # overwriting priority, keep the first.
-            attrs = getattr(base_cls, '__primary_key__', None)
+            attrs = getattr(base_cls, '__dobject_key__', None)
             if attrs is not None:
                 pkey_attrs.update(attrs)
 
-            attrs = getattr(base_cls, '__value_attrs__', None)
+            attrs = getattr(base_cls, '__dobject_att__', None)
             if attrs is not None:
                 value_attrs.update(attrs)
 
-        primary_key = class_dict.pop('__primary_key__', None)
+        primary_key = class_dict.pop('__dobject_key__', None)
 
         attributes = OrderedDict()
         for attr_name, descriptor in class_dict.items():
@@ -84,12 +84,12 @@ class DObjectMetaClass(type):
                             raise TypeError(errmsg)
                         pkey_names.add(attr.name)
                     else:
-                        errmsg = "The %d-th element in __primary_key__ should"
+                        errmsg = "The %d-th element in __dobject_key__ should"
                         errmsg += "a attribute or attribute name"
                         errmsg %= i
                         raise TypeError(errmsg)
             else:
-                raise TypeError('__primary_key__ should be a DAttribute object '
+                raise TypeError('__dobject_key__ should be a DAttribute object '
                                 'or an iterable of DAttribute object')
 
         if pkey_names:
@@ -109,10 +109,9 @@ class DObjectMetaClass(type):
 
         cls = type.__new__(metacls, classname, bases, class_dict)
 
-        setattr(cls, '__primary_key__', pkey_attrs)
-        setattr(cls, '__primary_key_class__', _make_pkey_class(cls))
-
-        setattr(cls, '__value_attrs__', value_attrs)
+        setattr(cls, '__dobject_key__', pkey_attrs)
+        setattr(cls, '__dobject_key_class__', _make_pkey_class(cls))
+        setattr(cls, '__dobject_att__', value_attrs)
         setattr(cls, '_re', ReshapeDescriptor())
 
         return cls
@@ -165,14 +164,14 @@ def _make_pkey_class(dobj_cls, attr_names = None):
     typename = dobj_cls.__name__ + '_key_tuple'
 
     if attr_names is None:
-        attr_names = dobj_cls.__primary_key__
+        attr_names = dobj_cls.__dobject_key__
 
     attr_names = [repr(name) for name in attr_names]
 
     class_code = _pkey_class_tmpl.format(typename = typename,
                                          attr_names = ', '.join(attr_names))
 
-    for i, attr_name in enumerate(dobj_cls.__primary_key__):
+    for i, attr_name in enumerate(dobj_cls.__dobject_key__):
         class_code += _pkey_attr_tmpl.format(name=attr_name, idx=i)
 
     namespace = dict(PrimaryKeyTuple = PrimaryKeyTuple,

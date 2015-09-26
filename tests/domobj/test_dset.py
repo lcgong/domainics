@@ -29,7 +29,7 @@ def test_dset_primary_key():
         b = datt(int)
         c = datt(int)
 
-        __primary_key__ = [a]
+        __dobject_key__ = [a]
 
 
     a_list = [A(a=1, b=1, c=2), A(a=1, b=2, c=3)]
@@ -47,8 +47,8 @@ def test_dset_primary_key():
 
     assert len(s) == 1
     assert s[0].c == 2
-    assert len(s[0].__primary_key__) == 1
-    assert s[0].__primary_key__.a == 1
+    assert len(s[0].__dobject_key__) == 1
+    assert s[0].__dobject_key__.a == 1
 
     s.add(a_list[1])
     assert len(s) == 1

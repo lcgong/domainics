@@ -194,8 +194,8 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
 
     attributes = OrderedDict()
-    for attr_name, attr in iter_chain(orig_cls.__primary_key__.items(),
-                                      orig_cls.__value_attrs__.items()):
+    for attr_name, attr in iter_chain(orig_cls.__dobject_key__.items(),
+                                      orig_cls.__dobject_att__.items()):
 
             if attr_name in substituted:
                 attributes[substituted[attr_name]] = attr
@@ -205,8 +205,8 @@ def _reshape_class(orig_cls, *args, **kwargs):
     # ONLY substitute the original object's attribute names
     for old_attr_name, new_attr_name  in substituted.items():
 
-        if (old_attr_name not in orig_cls.__value_attrs__ and
-                old_attr_name not in orig_cls.__primary_key__):
+        if (old_attr_name not in orig_cls.__dobject_att__ and
+                old_attr_name not in orig_cls.__dobject_key__):
 
             errmsg = "No found the attribute '%s' substituted by '%s' in %s"
             errmsg = (old_attr_name, new_attr_name, orig_cls.__name__)
@@ -221,8 +221,8 @@ def _reshape_class(orig_cls, *args, **kwargs):
             ignored.remove(old_attr_name)
 
     for cls in combined:
-        for attr_name, attr in iter_chain(cls.__primary_key__.items(),
-                                          cls.__value_attrs__.items()):
+        for attr_name, attr in iter_chain(cls.__dobject_key__.items(),
+                                          cls.__dobject_att__.items()):
 
             if attr_name not in attributes:
                 attributes[attr_name] = attr
@@ -257,9 +257,9 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
         new_pkeys = pkeys
     else:
-        if orig_cls.__primary_key__:
+        if orig_cls.__dobject_key__:
             new_pkeys = []
-            for attr_name in orig_cls.__primary_key__:
+            for attr_name in orig_cls.__dobject_key__:
                 if attr_name in substituted:
                     attr_name = substituted[attr_name]
 
@@ -271,7 +271,7 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
 
 
-    attributes['__primary_key__'] = new_pkeys
+    attributes['__dobject_key__'] = new_pkeys
 
 
     if not new_bases:
@@ -319,12 +319,12 @@ class ReshapeOperator:
         tmpl_pkey = None
         tmpl_attrs = OrderedDict()
         for cls in iter_chain([self.source], self._base):
-            if tmpl_pkey is None and cls.__primary_key__:
+            if tmpl_pkey is None and cls.__dobject_key__:
                 # The nearest primary key definition is valid
-                tmpl_pkey = cls.__primary_key__
+                tmpl_pkey = cls.__dobject_key__
 
-            for attr_name, attr in iter_chain(cls.__primary_key__.items(),
-                                              cls.__value_attrs__.items()):
+            for attr_name, attr in iter_chain(cls.__dobject_key__.items(),
+                                              cls.__dobject_att__.items()):
                 if attr_name not in tmpl_attrs:
                     tmpl_attrs[attr_name] = attr
 
@@ -356,7 +356,7 @@ class ReshapeOperator:
                     continue
             pkey_attrs.append(attr)
 
-        prop_dict['__primary_key__'] = pkey_attrs
+        prop_dict['__dobject_key__'] = pkey_attrs
 
         if not self._base:
             # Oops, workaround, avoid cyclical importing!!!

@@ -50,7 +50,7 @@ class datt(DAttribute):
         return attr_value
 
     def __set__(self, instance, value):
-        if self.name in instance.__class__.__primary_key__:
+        if self.name in instance.__class__.__dobject_key__:
             errmsg = "The primary key attribute '%s' is read-only"
             errmsg %= self.name
             raise ValueError(errmsg)

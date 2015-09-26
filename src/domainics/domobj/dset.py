@@ -31,14 +31,14 @@ class dset(DSet):
                 item_key = OrderedDict([(item_key.name, item_key)])
 
             elif isinstance(item_key, str):
-                if item_key in item_type.__primary_key__:
+                if item_key in item_type.__dobject_key__:
                     item_key = [(item_key,
-                                    item_type.__primary_key__[item_key])]
+                                    item_type.__dobject_key__[item_key])]
                     item_key = OrderedDict(primary_key)
 
-                elif item_key in item_type.__value_attrs__:
+                elif item_key in item_type.__dobject_att__:
                     item_key = OrderedDict([(item_key,
-                                        item_type.__value_attrs__[item_key])])
+                                        item_type.__dobject_att__[item_key])])
                 else:
                     errmsg = "No '%s' attribute is defined in %s"
                     errmsg %= (item_key, item_type.__name__)
@@ -51,11 +51,11 @@ class dset(DSet):
                         pkeys[attr.name] = attr
 
                     elif isinstance(attr, str):
-                        if attr in item_type.__primary_key__:
-                            attr = item_type.__primary_key__[attr]
+                        if attr in item_type.__dobject_key__:
+                            attr = item_type.__dobject_key__[attr]
 
-                        elif attr in item_type.__value_attrs__:
-                            attr = item_type.__value_attrs__[attr]
+                        elif attr in item_type.__dobject_att__:
+                            attr = item_type.__dobject_att__[attr]
                         else:
                             errmsg = "No '%s' attribute is defined in %s"
                             errmsg %= (attr, item_type.__name__)
@@ -76,14 +76,14 @@ class dset(DSet):
 
         else:
             # item_key is not specified by inialization of dset
-            if not item_type.__primary_key__:
+            if not item_type.__dobject_key__:
                 errmsg = "primary key should be given in item_key argument "
                 errmsg += " or be defined in %s class "
                 errmsg %= item_type.__name__
                 raise ValueError(errmsg)
 
-            self.__item_key__ = item_type.__primary_key__
-            self.__item_key_class__ = item_type.__primary_key_class__
+            self.__item_key__ = item_type.__dobject_key__
+            self.__item_key_class__ = item_type.__dobject_key_class__
 
 
 
@@ -119,7 +119,7 @@ class dset(DSet):
             raise TypeError(errmsg)
 
         pkey = self.__item_key_class__(obj)
-        # pkey = obj.__primary_key__
+        # pkey = obj.__dobject_key__
         if not pkey:
             errmsg = "The item's identity of %s is required"
             errmsg %= obj.__class__.__name__
@@ -150,12 +150,12 @@ class dset(DSet):
             pkey_obj = self.__item_key_class__(**obj)
         elif isinstance(obj, DObject):
             if (self.__item_key_class__ !=
-                    obj.__class__.__primary_key_class__):
+                    obj.__class__.__dobject_key_class__):
                 pkey_obj = self.__item_key_class__(
                     *(getattr(obj, attr_name)
                         for attr_name in self.__item_key__))
             else:
-                pkey_obj = obj.__primary_key__
+                pkey_obj = obj.__dobject_key__
 
         else:
             errmsg = 'The type of object should be DObject, identity or int: %s'
@@ -233,7 +233,7 @@ class dset(DSet):
         elif isinstance(index, int):
             item = self.__list[index]
             del self.__list[index]
-            del self.__map[item.__primary_key__]
+            del self.__map[item.__dobject_key__]
 
         elif isinstance(index, slice):
             lst = [self.index(item) for item in self.__list.__getitem__(index)]

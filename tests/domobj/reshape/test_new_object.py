@@ -19,7 +19,7 @@ def test_new_object():
         d = datt(Decimal)
         e = datt(datetime)
 
-        __primary_key__ = [a, b]
+        __dobject_key__ = [a, b]
 
     a1 = A(a=1, b='abc', c=123.4, d='45.67', e='2015-07-29')
     assert a1.e == date(2015, 7, 29)

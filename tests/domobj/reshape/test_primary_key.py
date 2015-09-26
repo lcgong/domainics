@@ -18,15 +18,15 @@ def test_primary_key():
 
         x = datt(int)
 
-        __primary_key__ =[s, 'n']
+        __dobject_key__ =[s, 'n']
 
     a = I(s = 1, n=2, x=3)
     b = I(s = 1, n=2, x=5)
-    assert a.__primary_key__ == b.__primary_key__
-    assert hash(a.__primary_key__) == hash(b.__primary_key__)
-    assert isinstance(a.__primary_key__, PrimaryKeyTuple[I])
+    assert a.__dobject_key__ == b.__dobject_key__
+    assert hash(a.__dobject_key__) == hash(b.__dobject_key__)
+    assert isinstance(a.__dobject_key__, PrimaryKeyTuple[I])
     assert issubclass(PrimaryKeyTuple[I], PrimaryKeyTuple[AnyDObject])
-    # assert isinstance(a.__primary_key__, PrimaryKeyTuple[AnyDObject])
+    # assert isinstance(a.__dobject_key__, PrimaryKeyTuple[AnyDObject])
     # some wrong in python 3.5, it's not transitive
 
     print(b)
@@ -49,7 +49,7 @@ def test_equal():
         c = datt(int)
         d = datt(int)
 
-        __primary_key__ = [a, b]
+        __dobject_key__ = [a, b]
 
     assert A(a=1, b=2) == A(a=1, b=2)
     assert A(a=1, b=2, d=3) == A(a=1, b=2, d=4) # d irrevalent!
@@ -58,7 +58,7 @@ def test_equal():
 def test_bool():
 
     assert not dobject()
-    
+
     class A(dobject):
         pass
 

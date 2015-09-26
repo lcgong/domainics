@@ -20,8 +20,8 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         # store values of attributes
         super(dobject, instance).__setattr__('__value_dict__', OrderedDict())
 
-        attributes = OrderedDict(iter_chain(cls.__primary_key__.items(),
-                                            cls.__value_attrs__.items()))
+        attributes = OrderedDict(iter_chain(cls.__dobject_key__.items(),
+                                            cls.__dobject_att__.items()))
 
         seen = set()
         if args:
@@ -72,10 +72,10 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         #     # force it to get chance to check default value
 
         pkey_att_vals = tuple(getattr(instance, attr_name)
-                                for attr_name in cls.__primary_key__)
+                                for attr_name in cls.__dobject_key__)
 
-        setattr(instance, '__primary_key__',
-                                        cls.__primary_key_class__(instance))
+        setattr(instance, '__dobject_key__',
+                                        cls.__dobject_key_class__(instance))
 
         return instance
 
@@ -97,9 +97,9 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         """ """
         values =  self.__value_dict__
 
-        segs = [repr(self.__primary_key__)] if self.__primary_key__ else []
+        segs = [repr(self.__dobject_key__)] if self.__dobject_key__ else []
         segs += ['%s=%r' % (attr_name, values.get(attr_name))
-                    for attr_name in self.__class__.__value_attrs__]
+                    for attr_name in self.__class__.__dobject_att__]
 
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
@@ -121,10 +121,10 @@ class dobject(DObject, metaclass=DObjectMetaClass):
             raise ValueError(errmsg)
             # other = self.__class__(other) # it's weird:   A() == 9999
 
-        if self.__class__.__primary_key__:
-            return self.__primary_key__ == other.__primary_key__
+        if self.__class__.__dobject_key__:
+            return self.__dobject_key__ == other.__dobject_key__
 
-        for attr_name in self.__class__.__value_attrs__.keys():
+        for attr_name in self.__class__.__dobject_att__.keys():
             if getattr(self, attr_name) != getattr(other, attr_name, None):
                 return False
 
@@ -135,11 +135,11 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         """
         cls = self.__class__
 
-        if not cls.__value_attrs__ and not cls.__primary_key__:
+        if not cls.__dobject_att__ and not cls.__dobject_key__:
             return False  # no attribues defined in this dobject
 
-        for attr_name, attr in iter_chain(cls.__primary_key__.items(),
-                                          cls.__value_attrs__.items()):
+        for attr_name, attr in iter_chain(cls.__dobject_key__.items(),
+                                          cls.__dobject_att__.items()):
 
             if attr_name not in self.__value_dict__:
                 continue # The truth value of attribute is false
