@@ -20,6 +20,8 @@ class DAttribute:
 class DAggregate(DAttribute):
     pass
 
+class PrimaryKeyTuple(Generic[AnyDObject]):
+    pass
 
 def cast_attr_value(attrname, val, attr_type):
     if val is None:

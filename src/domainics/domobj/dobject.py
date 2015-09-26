@@ -13,61 +13,69 @@ from .metaclass import DObjectMetaClass
 
 class dobject(DObject, metaclass=DObjectMetaClass):
 
-    def __new__(cls, *values, **kwvalues):
-        """
-        ordinal value: in defined order and mro
-        """
-        values = list(values)
-        instance = super(dobject, cls).__new__(cls)
-        attr_values = OrderedDict()
-        instance_setattr = super(dobject, instance).__setattr__
-        instance_setattr('__value_dict__', attr_values)
+    def __new__(cls, *args, **kwargs):
 
-        # if not values and not kwvalues:  # empty object
-        #     return instance
+        instance = super(dobject, cls).__new__(cls)  # new instance of dobject
 
-        # if values and isinstance(values[0], ReshapeOperator): # have a peek
-        #     # this argument value is reshape operator, consume it
-        #     values.pop().reshape_object(instance)
+        # store values of attributes
+        super(dobject, instance).__setattr__('__value_dict__', OrderedDict())
 
-        parameters = OrderedDict(iter_chain(cls.__primary_key__.items(),
+        attributes = OrderedDict(iter_chain(cls.__primary_key__.items(),
                                             cls.__value_attrs__.items()))
 
         seen = set()
-        # consume parameters with the positional arguments
-        for arg_value in values:
-            if not parameters:
-                raise TypeError('Too much positional argument given')
+        if args:
+            if len(args) > 1:
+                errmsg = "Do not exceed one positional argument: "
+                errmsg += "(obj, attr1='', ...) or (attr1='', ...) "
+                raise ValueError(errmsg)
 
-            arg_name, attr = parameters.popitem(last=False)
+            source_obj = args[0] # reshape the given object or dict
+            if isinstance(source_obj, Mapping): # like {}
+                for attr_name, attr in attributes.items():
+                    if attr_name in kwargs:
+                        continue # this value will be set laterly
+
+                    if attr_name not in source_obj:
+                        continue
+
+                    attr_val = source_obj[attr_name]
+                    attr.set_value_unguardedly(instance, attr_val)
+                    seen.add(attr_name)
+
+            else:
+                for attr_name, attr in attributes.items():
+                    if attr_name in kwargs:
+                        continue # this value will be set laterly
+
+                    if not hasattr(source_obj, attr_name):
+                        continue
+
+                    attr_val = getattr(source_obj, attr_name)
+                    attr.set_value_unguardedly(instance, attr_val)
+                    seen.add(attr_name)
+
+        for arg_name, arg_value in kwargs.items():
+
+            attr = attributes.get(arg_name, None)
+            if attr is None:
+                errmsg = "No attribue '%s' defined in %s"
+                errmsg %= (arg_name, cls.__name__)
+                raise ValueError(errmsg)
 
             attr.set_value_unguardedly(instance, arg_value)
             seen.add(arg_name)
 
-        # consume parameters with the keyword arguments
-        for arg_name, arg_value in kwvalues.items():
-            if arg_name in seen:
-                errmsg = "%s() got multiple values for argument '%s'"
-                errmsg %= (cls.__name__, arg_name)
-                raise TypeError(errmsg)
-
-            attr = parameters.pop(arg_name, None)
-            if attr is None:
-                errmsg = "%s() got an unexpected keyword argument '%s'"
-                errmsg %= (cls.__name__, arg_name)
-                raise TypeError(errmsg)
-
-            attr.set_value_unguardedly(instance, arg_value)
-
-        # set default values for these left parameters
-        for attr_name, attr in parameters.items():
-            getattr(instance, attr_name)
-            # force it to get chance to check default value
+        # # set default values for these left parameters
+        # for attr_name, attr in parameters.items():
+        #     getattr(instance, attr_name)
+        #     # force it to get chance to check default value
 
         pkey_att_vals = tuple(getattr(instance, attr_name)
                                 for attr_name in cls.__primary_key__)
-        pkey_obj = cls.__primary_key_class__(*pkey_att_vals)
-        setattr(instance, '__primary_key__', pkey_obj)
+
+        setattr(instance, '__primary_key__',
+                                        cls.__primary_key_class__(instance))
 
         return instance
 

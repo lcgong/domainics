@@ -32,22 +32,38 @@ Rehape dobject type:
 
     Change the bases
 
-        A._re(_base=B)
-        A._re(_base=[B, C])
+        A._re(_base=X)
+        A._re(_base=[X, Y])
 
-    Combine attributes from other dobject
-        A._re(_combine=[B, C])
+    Combine attributes from some dobjects
+        A._re(_combine=[X, Y])
+
+    Substitute attribute:
+
+        A._re(..., _subst=dict(attr1=attr1_new_name, ...))
 
 Reshape dobject object:
 
-    Cast a object in new type:
-        obj._re(A, ...)
+    Shape or reshape a object in a new type:
+        A()
+        A(B(), ...)
+        A(mapping_object, ...)
+        A(some_object, ...)
+
+        obj._re(A, ...)  # TBD: this form is still disputable.
 
     Set value of attribute
-        obj._re(A, attr1 = val1, attr2 = val2, ...)
         obj._re(attr1 = val1, attr2 = val2, ...)
 
-        obj.attr1 = val1  # This form cannot set primary key attribute.
+
+Attribute assigment:
+    In face, the assigment of attribute is not object reshaping. The object is
+    not reshape into a new object. Also, the assigment cannot change the value
+    of the attributes as primary key.
+
+    obj.attr1 = val1
+
+
 
 Empty dobject value
 
@@ -99,6 +115,44 @@ class ReshapeDescriptor:
 
 def _reshape_object(instance, *args, **kwargs):
     print(222333, args, kwargs)
+
+    """ """
+    this_class = instance.__class__
+
+# def _autoboxing_set(instance, *args, **kwargs):
+#     selected_attrs = OrderedDict()
+#     if self.required:
+#         for attr_name, attr in iter_chain(
+#                                     this_class.__primary_key__,items(),
+#                                     this_class.__value_attrs__.items()):
+#
+#             if attr_name not in self.requred:
+#                 continue
+#
+#             if attr_name in self.ignored:
+#                 continue
+#             selected_attrs[attr_name] = attr
+#
+#     else:
+#         for attr_name, attr in iter_chain(
+#                                     this_class.__primary_key__.items(),
+#                                     this_class.__value_attrs__.items()):
+#
+#             if attr_name not in self.ignored:
+#                 selected_attrs[attr_name] = attr
+#
+#     from ._dobject import dobject
+#     if isinstance(self.source, (dobject, NamedDict)):
+#         for attr_name, attr in selected_attrs.items():
+#             if hasattr(self.source, attr_name):
+#                 attr_val = getattr(self.source, attr_name)
+#                 attr.set_value_unguardedly(instance, attr_val)
+#
+#     elif isinstance(self.source, Mapping):
+#         for attr_name, attr in selected_attrs.items():
+#             if attr_name in self.source:
+#                 attr.set_value_unguardedly(instance,
+#                                            self.source[attr_name])
 
 
 def _reshape_class(instance, *args, **kwargs):
@@ -257,40 +311,40 @@ class ReshapeOperator:
         reshaped_cls = type(self._name, base_cls, prop_dict)
         return reshaped_cls
 
-    def reshape_object(self, instance):
-        """ """
-        this_class = instance.__class__
-
-        selected_attrs = OrderedDict()
-        if self.required:
-            for attr_name, attr in iter_chain(
-                                        this_class.__primary_key__,items(),
-                                        this_class.__value_attrs__.items()):
-
-                if attr_name not in self.requred:
-                    continue
-
-                if attr_name in self.ignored:
-                    continue
-                selected_attrs[attr_name] = attr
-
-        else:
-            for attr_name, attr in iter_chain(
-                                        this_class.__primary_key__.items(),
-                                        this_class.__value_attrs__.items()):
-
-                if attr_name not in self.ignored:
-                    selected_attrs[attr_name] = attr
-
-        from ._dobject import dobject
-        if isinstance(self.source, (dobject, NamedDict)):
-            for attr_name, attr in selected_attrs.items():
-                if hasattr(self.source, attr_name):
-                    attr_val = getattr(self.source, attr_name)
-                    attr.set_value_unguardedly(instance, attr_val)
-
-        elif isinstance(self.source, Mapping):
-            for attr_name, attr in selected_attrs.items():
-                if attr_name in self.source:
-                    attr.set_value_unguardedly(instance,
-                                               self.source[attr_name])
+    # def reshape_object(self, instance):
+    #     """ """
+    #     this_class = instance.__class__
+    #
+    #     selected_attrs = OrderedDict()
+    #     if self.required:
+    #         for attr_name, attr in iter_chain(
+    #                                     this_class.__primary_key__,items(),
+    #                                     this_class.__value_attrs__.items()):
+    #
+    #             if attr_name not in self.requred:
+    #                 continue
+    #
+    #             if attr_name in self.ignored:
+    #                 continue
+    #             selected_attrs[attr_name] = attr
+    #
+    #     else:
+    #         for attr_name, attr in iter_chain(
+    #                                     this_class.__primary_key__.items(),
+    #                                     this_class.__value_attrs__.items()):
+    #
+    #             if attr_name not in self.ignored:
+    #                 selected_attrs[attr_name] = attr
+    #
+    #     from ._dobject import dobject
+    #     if isinstance(self.source, (dobject, NamedDict)):
+    #         for attr_name, attr in selected_attrs.items():
+    #             if hasattr(self.source, attr_name):
+    #                 attr_val = getattr(self.source, attr_name)
+    #                 attr.set_value_unguardedly(instance, attr_val)
+    #
+    #     elif isinstance(self.source, Mapping):
+    #         for attr_name, attr in selected_attrs.items():
+    #             if attr_name in self.source:
+    #                 attr.set_value_unguardedly(instance,
+    #                                            self.source[attr_name])
