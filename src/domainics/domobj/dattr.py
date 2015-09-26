@@ -6,7 +6,8 @@ from collections import namedtuple
 from collections.abc import Iterable
 from typing import Mapping, Generic
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, time
+from decimal import Decimal
 # from dateutil.parser import parse as datetime_parse
 
 from .typing import DSet, cast_attr_value, DAttribute, DAggregate
@@ -37,8 +38,8 @@ class datt(DAttribute):
             if isinstance(self.default, type):
                 attr_value = self.default()
             elif isinstance(self.default, (str, int, float, Decimal,
-                                           dt.date, dt.time, dt.datetime,
-                                           dt.timedelta)):
+                                           date, time, datetime,
+                                           timedelta)):
                 attr_value = self.default
             else:
                 errmsg = "Unknown the default value: %r" % self.default

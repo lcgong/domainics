@@ -104,25 +104,57 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'
 
     def __eq__(self, other) :
-        ''' ducking equals:
-        1. True if the identity of this object equals that of other;
-        2. True if all of fields of this object equal those of other '''
+        """
+        When the primary key attribute is specified, this dobject is equal to
+        the other if the attribues of primary key are equaled. Otherwise, all
+        attributes are needed to be equaled if the two dobject are equaled.
+        """
 
         if other is None :
             return False
 
-        this_id = self.__primary_key__
-        if this_id is not None and this_id == other.__primary_key__:
-            return True
+        # if not isinstance(other, dobject):  # it's weird:   A() == 9999
+        #
+        if not isinstance(other, dobject):  #
+            errmsg = "The value should be a dobject, not '%s' type"
+            errmsg %= other.__class__.__name__
+            raise ValueError(errmsg)
+            # other = self.__class__(other) # it's weird:   A() == 9999
 
-        if set(self.__value_dict__.keys()) != set(other.__value_dict__.keys()):
-            return False
+        if self.__class__.__primary_key__:
+            return self.__primary_key__ == other.__primary_key__
 
-        for name, val in self.__value_dict__.items():
-            if val != other.__value_dict__[name]:
+        for attr_name in self.__class__.__value_attrs__.keys():
+            if getattr(self, attr_name) != getattr(other, attr_name, None):
                 return False
 
         return True
+
+    def __bool__(self):
+        """
+        """
+        cls = self.__class__
+
+        if not cls.__value_attrs__ and not cls.__primary_key__:
+            return False  # no attribues defined in this dobject
+
+        print(111, self.__class__.__primary_key__)
+        for attr_name, attr in iter_chain(cls.__primary_key__.items(),
+                                          cls.__value_attrs__.items()):
+
+            print(222, attr_name)
+            if attr_name not in self.__value_dict__:
+                continue # The truth value of attribute is false
+
+            attr_val = getattr(self, attr_name)
+            if attr.default is not None:
+                if attr_val != attr.default:
+                    return True
+            elif attr_val:
+                    return True
+
+        return False
+
 
     def copy(self):
         self_attrs = getattr(self,   '__value_dict__')

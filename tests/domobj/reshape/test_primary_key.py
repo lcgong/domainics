@@ -10,16 +10,16 @@ from domainics.domobj.typing import PrimaryKeyTuple, AnyDObject
 def setup_module(module):
     print()
 
-class I(dobject):
-    s = datt(int)
-    n = datt(int)
-
-    x = datt(int)
-
-    __primary_key__ =[s, 'n']
-
 
 def test_primary_key():
+    class I(dobject):
+        s = datt(int)
+        n = datt(int)
+
+        x = datt(int)
+
+        __primary_key__ =[s, 'n']
+
     a = I(s = 1, n=2, x=3)
     b = I(s = 1, n=2, x=5)
     assert a.__primary_key__ == b.__primary_key__
@@ -32,4 +32,47 @@ def test_primary_key():
     print(b)
 
 def test_equal():
-    pass
+
+    class A(dobject):
+        a = datt(int)
+        b = datt(int)
+        c = datt(int)
+        d = datt(int)
+
+    assert A(a=1, b=2) == A(a=1, b=2)
+    assert A(a=1, b=2, d=3) != A(a=1, b=2, d=4)
+    assert A(a=1, b=2, d=3) == A(a=1, b=2, d=3)
+
+    class A(dobject):
+        a = datt(int)
+        b = datt(int)
+        c = datt(int)
+        d = datt(int)
+
+        __primary_key__ = [a, b]
+
+    assert A(a=1, b=2) == A(a=1, b=2)
+    assert A(a=1, b=2, d=3) == A(a=1, b=2, d=4) # d irrevalent!
+    assert A(a=1, b=2, d=3) == A(a=1, b=2, d=3)
+
+def test_bool():
+    class A(dobject):
+        pass
+
+    assert not A()
+
+    class A(dobject):
+        a = datt(int)
+        b = datt(int)
+        c = datt(int, default=100)
+        d = datt(int)
+
+    assert not A()
+    assert not A(a=None)
+    assert A().c == 100
+    assert not A(c=100)
+    assert A(a=1)
+
+    with pytest.raises(ValueError) as exc:
+        assert A(b=None) == False
+    print(exc)
