@@ -43,6 +43,38 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                     attr.set_value_unguardedly(instance, attr_val)
                     seen.add(attr_name)
 
+            elif isinstance(source_obj, DObject):
+                print(cls.__dobject_origin_class__, cls.__dobject_mapping__)
+                print(isinstance(source_obj, cls.__dobject_origin_class__))
+                if isinstance(source_obj, cls.__dobject_origin_class__):
+                    subst_mapping = cls.__dobject_mapping__
+                    substituted = set(cls.__dobject_mapping__.values())
+                else:
+                    subst_mapping = {}
+                    substituted = set()
+
+
+                for attr_name, attr in attributes.items():
+                    if attr_name in kwargs:
+                        continue # this value will be set laterly
+
+                    if attr_name in substituted:
+                        # the attribute is the old name in original obj
+                        continue
+
+                    if attr_name in subst_mapping:
+                        src_attr_name = subst_mapping[attr_name]
+                    else:
+                        src_attr_name = attr_name
+
+                    if not hasattr(source_obj, src_attr_name):
+                        continue
+
+                    print(attr_name, src_attr_name)
+
+                    attr_val = getattr(source_obj, src_attr_name)
+                    attr.set_value_unguardedly(instance, attr_val)
+                    seen.add(attr_name)
             else:
                 for attr_name, attr in attributes.items():
                     if attr_name in kwargs:

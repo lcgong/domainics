@@ -63,7 +63,7 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
         del kwargs[arg_name]
 
-    arg_name = '_pkey'
+    arg_name = '_key'
     if arg_name in kwargs:
         arg_value = kwargs[arg_name]
         if isinstance(arg_value, Iterable):
@@ -272,7 +272,14 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
 
     attributes['__dobject_key__'] = new_pkeys
+    attributes['__dobject_origin_class__'] = orig_cls
 
+    subst_map = OrderedDict()
+    for old_name, new_name in substituted.items():
+        subst_map[new_name] = old_name
+
+    attributes['__dobject_mapping__'] = subst_map
+    print(444, subst_map)
 
     if not new_bases:
         new_bases = orig_cls.__bases__
