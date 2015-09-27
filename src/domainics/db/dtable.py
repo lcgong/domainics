@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from ..domobj import dobject, dset, datt
+from ..domobj import dobject, dset, DSetBase, datt
 
 
 class dtable(dobject):
@@ -19,7 +19,7 @@ class tcol(datt):
         super(tcol, self).__init__(datatype, **kwargs)
 
 
-class DBArray(dset):
+class DBArray(DSetBase):
 
     @classmethod
     def __setter_filter__(cls, value):

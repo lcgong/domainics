@@ -44,9 +44,10 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                     seen.add(attr_name)
 
             elif isinstance(source_obj, DObject):
-                print(cls.__dobject_origin_class__, cls.__dobject_mapping__)
-                print(isinstance(source_obj, cls.__dobject_origin_class__))
-                if isinstance(source_obj, cls.__dobject_origin_class__):
+                # print(cls.__dobject_origin_class__, cls.__dobject_mapping__)
+                # print(isinstance(source_obj, cls.__dobject_origin_class__))
+                if (cls.__dobject_origin_class__ and
+                        isinstance(source_obj, cls.__dobject_origin_class__)):
                     subst_mapping = cls.__dobject_mapping__
                     substituted = set(cls.__dobject_mapping__.values())
                 else:

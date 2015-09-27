@@ -112,6 +112,9 @@ class DObjectMetaClass(type):
         setattr(cls, '__dobject_key__', pkey_attrs)
         setattr(cls, '__dobject_key_class__', _make_pkey_class(cls))
         setattr(cls, '__dobject_att__', value_attrs)
+        setattr(cls, '__dobject_origin_class__', None)
+        setattr(cls, '__dobject_mapping__', OrderedDict())
+
         setattr(cls, '_re', ReshapeDescriptor())
 
         return cls

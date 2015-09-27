@@ -10,6 +10,7 @@ from domainics.domobj import dobject, datt, dset
 import pytest
 
 
+
 def setup_module(module):
     print()
 

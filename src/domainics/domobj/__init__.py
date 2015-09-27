@@ -110,11 +110,17 @@ DSet
     #                  doc = "")
 
 
-    ASet = dset(A, _key=sn, _item_key=[..], sn=A.sn)._re(_subst=dict(sn='ssn'))
+    The key of item is required.
+
+    __dominion_object__
+    __dominion_class__
+    __dobject_key__
+
+    ASet = dset(A, _key=sn, _dominion=P, sn=A.sn)._re(_subst=dict(sn='ssn'))
     # sn is substituted to ssn, where the link is changed to ssn=A.sn
     s1 = ASet([adsds], sn=123)
 
-    BSet = dset(B, _key=no, _item_key=[..], sn=A.sn)
+    BSet = dset(B, _key=no, sn=A.sn)
     s2 = BSet(s1) #
 
 
@@ -122,10 +128,9 @@ DSet
 
 Specicial attribues:
 
-    dobject object
-
-        :__primary_key__: It is a object of PrimaryKey that is a compound
-                          of attribute value as a primary key of the domain object.
+    __dobject_key__
+    __dobject_key_class__
+    __dobject_att__
 
 """
 
@@ -161,4 +166,4 @@ by forbidding external objects from holding references to its members.
 from .typing import DSet, DObject
 from .dattr import datt
 from .dobject import dobject
-from .dset import dset
+from .dset import dset, DSetBase
