@@ -44,8 +44,6 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                     seen.add(attr_name)
 
             elif isinstance(source_obj, DObject):
-                # print(cls.__dobject_origin_class__, cls.__dobject_mapping__)
-                # print(isinstance(source_obj, cls.__dobject_origin_class__))
                 if (cls.__dobject_origin_class__ and
                         isinstance(source_obj, cls.__dobject_origin_class__)):
                     subst_mapping = cls.__dobject_mapping__
@@ -70,8 +68,6 @@ class dobject(DObject, metaclass=DObjectMetaClass):
 
                     if not hasattr(source_obj, src_attr_name):
                         continue
-
-                    print(attr_name, src_attr_name)
 
                     attr_val = getattr(source_obj, src_attr_name)
                     attr.set_value_unguardedly(instance, attr_val)

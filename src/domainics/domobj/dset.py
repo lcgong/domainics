@@ -73,8 +73,6 @@ def dset(*args, **kwargs):
     dset_cls.__dobject_key_class__ = _make_pkey_class(dset_cls)
     dset_cls.__dobject_att__ = OrderedDict()
 
-    print(dset_key, dominion_class)
-
     try:
         frame = sys._getframe(1)
         dset_cls.__module__ = frame.f_globals.get('__name__', '__main__')
@@ -88,11 +86,53 @@ def dset(*args, **kwargs):
 class DSetBase(dobject):
     """The set of dobjects.
     """
-    # __dset_item_class__ = None
-    # __dominion_class__ = None
-    # __dobject_key__ = None
 
     def __new__(cls, *args, **kwargs):
+
+        dominion_obj = None
+        arg_name = "_dominion"
+        if arg_name in kwargs:
+            dominion_obj = kwargs.pop(arg_name)
+            if not isinstance(dominion_obj, DObject):
+                raise ValueError()
+
+        origin_obj = None
+        if args:
+            if len(args) == 1:
+                origin_obj += args[0]
+            else:
+                raise ValueError('')
+
+        if dominion_obj is not None:
+            orig_domi_obj = dominion_obj
+
+        elif origin_obj is not None:
+            orig_domi_obj = origin_obj
+
+        else:
+            orig_domi_obj = None
+
+        if orig_domi_obj is not None:
+            if isinstance(orig_domi_obj, Mapping):
+                for attr_name, attr in cls.__dobject_key__.items():
+                    if attr_name in kwargs:
+                        continue
+
+                    if not hasattr(orig_domi_obj, attr_name):
+                        continue
+
+                    kwargs[attr_name] = orig_domi_obj[attr_name]
+            else:
+                for attr_name, attr in cls.__dobject_key__.items():
+                    if attr_name in kwargs:
+                        continue
+
+                    if not hasattr(orig_domi_obj, attr_name):
+                        continue
+
+                    kwargs[attr_name] = getattr(orig_domi_obj, attr_name)
+
+
 
         instance = super(DSetBase, cls).__new__(cls, **kwargs)
 
@@ -100,13 +140,24 @@ class DSetBase(dobject):
         instance_setter('__dset_item_dict__',  OrderedDict())
         instance_setter('__dominion_object__',  None)
 
-        if args:
-            instance += args[0]
 
-        print('333', instance.a, instance.__dobject_key__)
 
-        print(444, instance.__dobject_key_class__,
-        instance.__dobject_key_class__(instance))
+
+        for attr_name in kwargs.keys():
+            attr = cls.__dobject_key__.get(attr_name, None)
+            if attr is not None:
+                attr_value = kwargs[attr_name]
+                print(555, attr_value)
+                attr.set_value_unguardedly(instance, attr_value)
+            else:
+                errmsg = "Unknown attribute: " + attr_name
+                raise ValueError(errmsg)
+
+        if origin_obj is not None:
+            for item in origin_obj:
+                instance._add(item)
+
+        print(666, getattr(instance, 'a', None))
 
         return instance
 
@@ -114,9 +165,17 @@ class DSetBase(dobject):
         """
         If the identity of obj has been added, replace the old one with it.
         """
-        # print(obj)
+
         obj = self.__dset_item_class__(obj)
         key = obj.__dobject_key__
+
+        for attr_name in self.__class__.__dobject_key__:
+            if not hasattr(obj, attr_name):
+                continue
+
+            attr_value = getattr(self, attr_name)
+            setattr(obj, attr_name, attr_value)
+
         self.__dset_item_dict__[key] = obj
 
         return self
@@ -147,7 +206,6 @@ class DSetBase(dobject):
     def __repr__(self):
 
         opts = []
-        print(333, len(self.__class__.__dobject_key__), len(self.__dobject_key__))
 
         if self.__class__.__dobject_key__:
             opts.append(repr(self.__dobject_key__))

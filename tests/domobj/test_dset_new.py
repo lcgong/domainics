@@ -31,8 +31,15 @@ def test_dset_1():
     # A <>---> B
     BSet = dset(B, _dominion=A, _key=A.a)
 
-    s1 = BSet(a=1001)
+    a = A(a=101, b =102)
+
+    from domainics.domobj import DObject
+
+    assert isinstance(a, DObject)
+
+    s1 = BSet(_dominion=a)
     s1 += [B(x=1, y=11), B(x=2, y=22), B(x=2, y=22)]
+
 
     print(s1)
 
