@@ -16,6 +16,12 @@ from .typing import cast_attr_value, parse_attr_value_many
 from .reshape import ReshapeDescriptor
 
 
+_keywords = set(["__module__", "__qualname__", "__new__", "__setattr__",
+                 "__repr__", "__eq__", "__bool__", "__doc__", "__iter__",
+                 "__getitem__", "__delitem__", "__setitem__", "__hash__",
+                 "__iadd__",
+                 "_export", "_add", "_clear", "__json_object__", "__len__",
+                 "__dobject_key__", "__dobject_att__", "__dobject_origin_class__", "__dobject_mapping__", "_re"])
 
 class DObjectMetaClass(type):
     """A Metacalss of dobject.
@@ -48,11 +54,20 @@ class DObjectMetaClass(type):
         attributes = OrderedDict()
         for attr_name, descriptor in class_dict.items():
             if attr_name.startswith('_'):
+                if attr_name not in _keywords:
+                    err = "Unknown preserved attribute in %s: %s"
+                    err %= (classname, attr_name)
+                    raise ValueError(err)
+
                 continue
 
             if isinstance(descriptor, DAttribute):
                 descriptor.name = attr_name
                 attributes[attr_name] = descriptor
+            else:
+                err = "Unknown attribute declaration in %s: %s"
+                err %= (classname, attr_name)
+                raise TypeError(err)
 
         primary_key = class_dict.pop('__dobject_key__', None)
         primary_key = parse_attr_value_many(primary_key, '__dobject_key__')

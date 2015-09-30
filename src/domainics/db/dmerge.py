@@ -6,7 +6,7 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 from itertools import chain as iter_chain
 
-from ..domobj import dset, dobject, reshape
+from ..domobj import dset, DSetBase, dobject, reshape
 from .dtable import json_object, dtable, dsequence
 
 from .sqlblock import dbc
@@ -24,9 +24,9 @@ def _dtable_diff(current, past=None):
     dellst = [] # [objid] the objid to be deleted
     chglst = [] # [{attr: (current, past)}],  modified
 
-    item_type = current.item_type
-    pkey_attrs = item_type.__primary_key__
-    value_attrs = item_type.__value_attrs__
+    item_type = current.__dset_item_class__
+    pkey_attrs = item_type.__dobject_key__
+    value_attrs = item_type.__dobject_att__
     for curr_obj in current:
         if curr_obj not in past:
             inslst.append(curr_obj)
@@ -47,7 +47,7 @@ def _dtable_diff(current, past=None):
             modified[attr_name] = (newval, oldval)
 
         if modified:
-            chglst.append((curr_obj.__primary_key__, modified))
+            chglst.append((curr_obj.__dobject_key__, modified))
 
     for past_obj in past:
         if past_obj not in current:
@@ -73,7 +73,7 @@ def _dtable_diff(current, past=None):
     dt_ins = _EntryTuple(pkey_attrs, pkvals, value_attrs, values)
 
     # deleted data tuple
-    item_type = past.item_type
+    item_type = past.__dset_item_class__
     pkvals = []
     for obj in dellst:
         pkvals.append(tuple(getattr(obj, f) for f in pkey_attrs))
@@ -95,12 +95,12 @@ def _dtable_diff(current, past=None):
 def pq_dtable_merge(current, past):
 
     dins, dchg, ddel = _dtable_diff(current, past)
-    table_name = current.item_type.__name__
+    table_name = current.__dset_item_class__.__name__
 
-    dobj_cls = current.item_type
+    dobj_cls = current.__dset_item_class__
     attrs = OrderedDict((attr_name, attr) for attr_name, attr in
-                        iter_chain(dobj_cls.__primary_key__.items(),
-                                   dobj_cls.__value_attrs__.items()))
+                        iter_chain(dobj_cls.__dobject_key__.items(),
+                                   dobj_cls.__dobject_att__.items()))
 
     seq_attrs = {}
     for n, attr in attrs.items():
@@ -218,31 +218,31 @@ def dmerge(current, origin=None):
     if current is None and origin is None:
         return
 
-    if current is not None and not isinstance(current, dset):
+    if current is not None and not isinstance(current, DSetBase):
         if not isinstance(current, dobject):
             err = 'The current object should be dobject or dset type: %s'
             err %= current.__class__.__name__
             raise TypeError(err)
 
-        dos = dset(item_type=current.__class__)
+        dos = dset(current.__class__)()
         dos.add(current)
         current = dos
 
-    if origin is not None and not isinstance(origin, dset):
+    if origin is not None and not isinstance(origin, DSetBase):
         if not isinstance(origin, dobject):
             err = 'The origin object should be dobject or dset type: %s'
             err %= origin.__class__.__name__
             raise TypeError(err)
 
-        dos = dset(item_type=origin.__class__)
+        dos = dset(origin.__class__)()
         dos.add(origin)
         origin = dos
 
     if current is None:
-        current = dset(item_type=origin.item_type)
+        current = origin.__class__()
 
     if origin is None:
-        origin = dset(item_type=current.item_type)
+        origin = current.__class__()
 
 
     if dbc.dbtype == 'postgres':
@@ -255,15 +255,15 @@ def drecall(obj):
     """
 
     obj_cls = obj.__class__
-    col_names = tuple(iter_chain(obj_cls.__primary_key__, obj.__value_attrs__))
+    col_names = tuple(iter_chain(obj_cls.__dobject_key__, obj.__dobject_att__))
 
     sql = "SELECT " + ','.join(col_names) + " FROM "
     sql += obj.__class__.__name__ + " WHERE "
     sql += ' AND '.join( pk_colname + "=%s"
-                            for pk_colname in obj_cls.__primary_key__)
+                            for pk_colname in obj_cls.__dobject_key__)
 
     pk_values = []
-    for val in obj.__primary_key__:
+    for val in obj.__dobject_key__:
         # if isinstance(val, dsequence):
         #     pk_values.append(val.value)
         # else:

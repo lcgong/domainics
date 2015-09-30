@@ -20,7 +20,7 @@ class t_a(dtable):
     e = tcol(int, doc="should be constrained")
     f = tcol(int)
 
-    __primary_key__ = [a, b]
+    __dobject_key__ = [a, b]
 
 def test_diff():
 

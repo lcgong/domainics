@@ -196,22 +196,22 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         return False
 
 
-    def copy(self):
-        self_attrs = getattr(self,   '__value_dict__')
-        kwargs = OrderedDict()
-        for attr_name in self_attrs:
-            value = self_attrs[attr_name]
+    # def _copy(self):
+    #     self_attrs = getattr(self,   '__value_dict__')
+    #     kwargs = OrderedDict()
+    #     for attr_name in self_attrs:
+    #         value = self_attrs[attr_name]
+    #
+    #         if isinstance(value, DSet) or isinstance(value, dobject):
+    #             value = value.copy()
+    #         else: # some copy
+    #             pass
+    #
+    #         kwargs[attr_name] = value
+    #
+    #     return self.__class__(**kwargs)
 
-            if isinstance(value, DSet) or isinstance(value, dobject):
-                value = value.copy()
-            else: # some copy
-                pass
-
-            kwargs[attr_name] = value
-
-        return self.__class__(**kwargs)
-
-    def export(self):
+    def _export(self):
         """export dobject as list or dict """
 
         self_attrs = getattr(self,   '__value_dict__')

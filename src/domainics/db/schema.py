@@ -20,17 +20,17 @@ from itertools import chain as iter_chain
 def repr_create_table(dobj_cls):
 
     attrs = OrderedDict((attr_name, attr) for attr_name, attr in
-                        iter_chain(dobj_cls.__primary_key__.items(),
-                                   dobj_cls.__value_attrs__.items()))
+                        iter_chain(dobj_cls.__dobject_key__.items(),
+                                   dobj_cls.__dobject_att__.items()))
 
     segments = []
     for name, attr in attrs.items():
         s = '  %s %s' % (name, repr_datatype(attr.type, attr.len))
         segments.append(s)
 
-    if dobj_cls.__primary_key__:
+    if dobj_cls.__dobject_key__:
         s = '  PRIMARY KEY(%s)'
-        s %=  ','.join(dobj_cls.__primary_key__.keys())
+        s %=  ','.join(dobj_cls.__dobject_key__.keys())
         segments.append(s)
 
     if hasattr(dobj_cls, '__tablename__'):

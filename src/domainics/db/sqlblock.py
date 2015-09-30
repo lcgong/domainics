@@ -200,8 +200,8 @@ class BaseSQLBlock:
     def __dset__(self, item_type):
 
         dobj_attrs = OrderedDict((attr_name, attr) for attr_name, attr in
-                            iter_chain(item_type.__primary_key__.items(),
-                                       item_type.__value_attrs__.items()))
+                            iter_chain(item_type.__dobject_key__.items(),
+                                       item_type.__dobject_att__.items()))
 
         colnames = []
         selected = []

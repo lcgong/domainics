@@ -25,32 +25,33 @@ class t_a(dtable):
     e = tcol(int, doc="should be constrained")
     f = tcol(int)
 
-    __primary_key__ = [a, b]
+    __dobject_key__ = [a, b]
 
 @transaction
 def test_diff():
 
     # orginal data
-    ds = dset(t_a, [
-            t_a(10010, 10011, 10012, 10013, 10014),
-            t_a(10010, 10021, 10022, 10023, 10024),
-            ])
+    ASet = dset(t_a)
 
-    # constrained information in this domain,
-    # reshape t_a to t_a1
-    t_a1 = reshape(t_a, _ignore=('c', 'e'))
-    ds1 = dset(t_a1, ds)
+    ds = ASet([t_a(a=101, b=102, c=103, d=104, e=105),
+               t_a(a=201, b=202, c=203, d=204, e=205)])
+
+    t_a1 = t_a._re(_ignore=['c', 'e'])
+    A1Set = dset(t_a1)
+
+    ds1 = A1Set(ds)
 
     dmerge(ds1)
 
     dbc << "SELECT * FROM t_a"
-    ds0 = dset(t_a1, dbc)
-    ds1 = ds0.copy()
-    ds1.add(t_a1(a=20010, b=10011, d=20013, f=3343))
-    ds1[0].f = 5555
-    print(333, ds1[1])
-    print(ds1)
-    del ds1[1]
-    print(ds1)
+    ds0 = A1Set(dbc) # original
+    ds1 = A1Set(ds0) # to be modified
+
+    ds1 += [t_a1(a=301, b=302, d=304, f=306)] # insert a new item
+    ds1[t_a(a=101, b=102)].f = 5555 # update the first item
+    del ds1[t_a(a=201, b=202)] # delete the 2nd item
+
+    print('ORIGINAL:', ds0)
+    print('MODIFIED:', ds1)
 
     dmerge(ds1, ds0)

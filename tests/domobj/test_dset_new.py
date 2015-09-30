@@ -113,6 +113,25 @@ def test_dset_declaration3():
         __dobject_key__ = [x]
 
 # @pytest.mark.skipif
+def test_dset_clone():
+    class B(dobject):
+        x = datt(int)
+        y = datt(int)
+        __dobject_key__ = [x]
+
+    BSet = dset(B)
+    ds1 = BSet([B(x=11, y=12), B(x=21,y=22)])
+    ds2 = BSet(ds1)
+
+    ls1 = list(ds1)
+    ls2 = list(ds2)
+
+    ls2[0].y = 102
+
+    assert ls1[0].y == 12 and ls2[0].y == 102
+
+
+# @pytest.mark.skipif
 def test_dset_links():
 
     class A(dobject):
