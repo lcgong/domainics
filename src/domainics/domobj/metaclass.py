@@ -132,6 +132,9 @@ class {typename}(PrimaryKeyTuple[DObjectType]):
 
     def __len__(self):
         return len(self._attr_names)
+
+    def __iter__(self):
+        return iter(self._attr_values)
 """
 _pkey_attr_tmpl="""\
     {name} = property(lambda self: self._attr_values[{idx}])

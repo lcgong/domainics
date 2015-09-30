@@ -61,13 +61,13 @@ class datt(DAttribute):
         if issubclass(self.type, DSetBase):
             dset_cls = self.type
             key_names = list(dset_cls.__dobject_key__.keys())
-            print('@@@@@@@@@@@@@@@@@: ', key_names, owner_class)
-            print('@@@Owner PK: : ', owner_class.__dobject_key__)
+
             self.type = dset(dset_cls.__dset_item_class__,
                              _dominion = owner_class,
-                             _key = key_names,
-                             **self.type.__dset_links__
+                             _key = key_names
                              )
+
+            self.type.__dset_links__ = dset_cls.__dset_links__
 
             self.default = self.type # the inializer of dset
 
@@ -75,7 +75,6 @@ class datt(DAttribute):
         """  """
 
         if issubclass(self.type, DSetBase):
-            print(22333, self.name, self.type,)
             return self.type(_dominion=instance)
 
         if isinstance(self.default, type):

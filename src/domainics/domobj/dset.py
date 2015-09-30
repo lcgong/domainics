@@ -14,6 +14,8 @@ from .typing import DObject, DSet, DSetBase, DAttribute, AnyDObject
 from .typing import parse_attr_value_many, consume_kwargs
 from .metaclass import _make_pkey_class, DObjectMetaClass
 
+from itertools import chain as iter_chain
+
 
 _dset_class_tmpl = """\
 class {typename}(DSetBase):
@@ -46,7 +48,6 @@ def dset(*args, **kwargs):
     if arg_name in kwargs:
         arg_value = parse_attr_value_many(kwargs.pop(arg_name), arg_name)
         for attr_name, attr in arg_value.items():
-            print(attr_name, attr)
             if attr is None:
                 undefined_attrs.add(attr_name)
                 continue
@@ -89,13 +90,18 @@ def dset(*args, **kwargs):
         attr = key_attrs[attr_name]
 
     links = OrderedDict()
-    for attr_name, attr in kwargs.items():
-        if not isinstance(attr, DAttribute):
+    for master_attr, slave_attr in kwargs.items():
+        if isinstance(slave_attr, str):
+            links[slave_attr] = master_attr
+
+        elif isinstance(slave_attr, DAttribute):
+            links[slave_attr.name] = master_attr
+
+        else:
             errmsg = "The value of link '%s' must be an attribue object"
-            errmsg %= attr_name
+            errmsg %= master_attr
             raise ValueError(errmsg)
 
-        links[attr_name] = attr
 
     if not key_attrs and dominion_class:
         key_attrs = dominion_class.__dobject_key__
@@ -233,12 +239,24 @@ class DSetBaseImpl(DSetBase, dobject):
         If the identity of obj has been added, replace the old one with it.
         """
 
-        obj = self.__dset_item_class__(obj)
+        item_cls = self.__dset_item_class__
+
+        obj = item_cls(obj) # clone it
         key = obj.__dobject_key__
+
+        links = self.__class__.__dset_links__
+        for attr_name in iter_chain(item_cls.__dobject_key__,
+                                    item_cls.__dobject_att__):
+            attr_value = None
+            if attr_name in links:
+                attr_value = getattr(self, links.get(attr_name))
+                setattr(obj, attr_name, attr_value)
 
         for attr_name in self.__class__.__dobject_key__:
             if not hasattr(obj, attr_name):
                 continue
+
+
 
             attr_value = getattr(self, attr_name)
             setattr(obj, attr_name, attr_value)

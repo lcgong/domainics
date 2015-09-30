@@ -15,7 +15,7 @@ import pytest
 def setup_module(module):
     print()
 
-@pytest.mark.skipif
+# @pytest.mark.skipif
 def test_dset_declaration1():
     class A(dobject):
         a = datt(int)
@@ -50,7 +50,7 @@ def test_dset_declaration1():
     assert BSet.a != A.a
     assert BSet.a.owner_class == BSet
 
-@pytest.mark.skipif
+# @pytest.mark.skipif
 def test_dset_declaration2():
 
     class B(dobject):
@@ -112,8 +112,9 @@ def test_dset_declaration3():
         y = datt(int)
         __dobject_key__ = [x]
 
+# @pytest.mark.skipif
 def test_dset_links():
-    
+
     class A(dobject):
         a = datt(int)
         b = datt(int)
@@ -124,21 +125,29 @@ def test_dset_links():
         y = datt(int)
         __dobject_key__ = [x]
 
-    BSet = dset(B, _key=A.a, y=A.a)
+    BSet = dset(B, _key=A.a, a='y') # link
+    s1 = BSet([B(x=1, y=11), B(x=2, y=22)], a=101)
+    sl = list(s1)
+    assert s1.a == 101 and sl[0].y == 101 and sl[1].y == 101
 
 
-#
-# def test_dset_3():
-#     class Item(dobject):
-#         line_no = datt(int)
-#         item_sn = datt(int)
-#         __dobject_key__ = [line_no]
-#
-#     class Bill(dobject):
-#         sn = datt(int)
-#         items = datt(dset(Item))
-#         __dobject_key__ = [sn]
-#
-#
-#     ASet = dset(Item)._re(_key=1)
-#     print(ASet)
+def test_dset_datt():
+    class Item(dobject):
+        bill_sn = datt(int)
+        line_no = datt(int)
+        item_sn = datt(int)
+
+        __dobject_key__ = [line_no]
+
+    class Bill(dobject):
+        sn = datt(int)
+        __dobject_key__ = [sn]
+        items = datt(dset(Item, sn='bill_sn'), doc="")
+
+    bill = Bill(sn=101)
+    assert tuple(bill.items.__dobject_key__) == (101,)
+    assert bill.items.sn == 101
+    bill.items._add(Item(line_no=1, item_sn=301))
+    sl = list(bill.items)
+    assert bill.sn == 101 and sl[0].bill_sn == 101
+    bill.items += [Item(line_no=1, item_sn=301), Item(line_no=2, item_sn=302)]
