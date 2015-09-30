@@ -6,7 +6,7 @@ from collections.abc import Iterable, Mapping
 from decimal import Decimal
 from itertools import chain as iter_chain
 
-from .typing import DSet, DObject
+from .typing import DSet, DObject, DSetBase
 from .metaclass import DObjectMetaClass
 # from ._reshape import ReshapeOperator
 
@@ -17,12 +17,14 @@ class dobject(DObject, metaclass=DObjectMetaClass):
 
         instance = super(dobject, cls).__new__(cls)  # new instance of dobject
 
+
         # store values of attributes
         super(dobject, instance).__setattr__('__value_dict__', OrderedDict())
 
         attributes = OrderedDict(iter_chain(cls.__dobject_key__.items(),
                                             cls.__dobject_att__.items()))
 
+        aggregates = []
         seen = set()
         if args:
             if len(args) > 1:
@@ -70,6 +72,12 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                         continue
 
                     attr_val = getattr(source_obj, src_attr_name)
+                    if isinstance(attr_val, DSetBase):
+                        # NOTED: the dominion object is required to replace
+                        aggregates.append((attr_name, attr, attr_val))
+                        continue
+
+
                     attr.set_value_unguardedly(instance, attr_val)
                     seen.add(attr_name)
             else:
@@ -95,6 +103,11 @@ class dobject(DObject, metaclass=DObjectMetaClass):
             attr.set_value_unguardedly(instance, arg_value)
             seen.add(arg_name)
 
+        for attr_name, attr, attr_val in aggregates:
+            print(5551, id(instance), id(attr_val.__dominion_object__), attr_val)
+            attr_val = attr.type(attr_val, _dominion = instance)
+            print(5552, id(attr_val.__dominion_object__),  attr_val)
+
         # # set default values for these left parameters
         # for attr_name, attr in parameters.items():
         #     getattr(instance, attr_name)
@@ -109,10 +122,10 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         return instance
 
 
-    def __getattr__(self, name):
-        errmsg ='The domain object %s has no field: %s '
-        errmsg %= (self.__class__.__name__, name)
-        raise AttributeError(errmsg)
+    # def __getattr__(self, name):
+    #     errmsg ='The domain object %s has no field: %s '
+    #     errmsg %= (self.__class__.__name__, name)
+    #     raise AttributeError(errmsg)
 
     def __setattr__(self, name, value):
         if hasattr(self, name):
@@ -127,7 +140,7 @@ class dobject(DObject, metaclass=DObjectMetaClass):
         values =  self.__value_dict__
 
         segs = [repr(self.__dobject_key__)] if self.__dobject_key__ else []
-        segs += ['%s=%r' % (attr_name, values.get(attr_name))
+        segs += ['%s=%r' % (attr_name, getattr(self, attr_name))
                     for attr_name in self.__class__.__dobject_att__]
 
         return self.__class__.__name__ + '(' + ', '.join(segs) + ')'

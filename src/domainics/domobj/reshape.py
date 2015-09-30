@@ -269,8 +269,6 @@ def _reshape_class(orig_cls, *args, **kwargs):
                 new_pkeys.append(attr_name)
 
 
-
-
     attributes['__dobject_key__'] = new_pkeys
     attributes['__dobject_origin_class__'] = orig_cls
 
@@ -279,17 +277,9 @@ def _reshape_class(orig_cls, *args, **kwargs):
         subst_map[new_name] = old_name
 
     attributes['__dobject_mapping__'] = subst_map
-    print(444, subst_map)
 
     if not new_bases:
         new_bases = orig_cls.__bases__
-        # from ..db.dtable import dtable
-        # from ._dobject import dobject
-        # if issubclass(self.source, dtable):
-        #     base_cls = tuple([dtable])
-        # else:
-        #     base_cls = tuple([dobject])
-        # # no inheritance, it's too complicated
     else:
         new_bases = tuple(new_bases)
 

@@ -100,14 +100,13 @@ DSet
 
     The link between dominion object and item object ...
 
-    A(sn) -> [ B(a_sn, ln) ] (_pkey=sn)
+    A(sn) -> [ B(a_sn, ln) ] (_key=sn)
 
 
     dominion
 
     # class A(dobject):
-    #     items = datt(dset(A, _key=sn, _item_key=[..], sn=A.sn),
-    #                  doc = "")
+    #     items = datt(dset(B, _key=sn, sn=B.sn), doc = "...")
 
 
     The key of item is required.
@@ -120,8 +119,11 @@ DSet
     # sn is substituted to ssn, where the link is changed to ssn=A.sn
     s1 = ASet([adsds], sn=123)
 
-    BSet = dset(B, _key=no, sn=A.sn)
-    s2 = BSet(s1) #
+    BSet = dset(B, _key=no, sn=A.sn) # make a new type dset
+    s2 = BSet(s1, attr=val) # create a dset object
+
+    # 
+
 
 
 

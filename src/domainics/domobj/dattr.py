@@ -11,21 +11,23 @@ from decimal import Decimal
 # from dateutil.parser import parse as datetime_parse
 
 from .typing import DSet, cast_attr_value, DAttribute, DAggregate
-
+from .typing import DObject, AnyDObject, DSetBase
+from .dset import dset
 
 class datt(DAttribute):
     """Attribute of dobject"""
 
     __slots__ = ('name', 'type', 'default_expr', 'default', 'doc')
 
-    def __init__(self, type=object, expr=None, default=None, doc=None):
+    def __init__(self, type=object, default=None, doc=None, **kwargs):
         self.name         = None
         self.type         = type
-        self.default_expr = expr
         self.default      = default
         self.doc          = doc
-        # why not to define primary key in attribute
-        # Such as, a pkey attribute is defined in parent, but not defined in child
+        self.owner_class  = None
+
+        self._kwargs = kwargs
+
 
     def __get__(self, instance, owner):
         if instance is None: # get domain field
@@ -34,17 +36,7 @@ class datt(DAttribute):
         attr_value = instance.__value_dict__.get(self.name, None)
 
         if attr_value is None and self.default is not None:
-            # set default value
-            if isinstance(self.default, type):
-                attr_value = self.default()
-            elif isinstance(self.default, (str, int, float, Decimal,
-                                           date, time, datetime,
-                                           timedelta)):
-                attr_value = self.default
-            else:
-                errmsg = "Unknown the default value: %r" % self.default
-                raise ValueError(errmsg)
-
+            attr_value = self.initialize(instance)
             self.set_value_unguardedly(instance, attr_value)
 
         return attr_value
@@ -57,6 +49,47 @@ class datt(DAttribute):
 
         self.set_value_unguardedly(instance, value)
 
+    def setup(self, owner_class, attr_name):
+        """
+        When building the dobject class, it' required to setup this attribute
+        to it (owner dobject class).
+        """
+
+        self.name = attr_name
+        self.owner_class = owner_class
+
+        if issubclass(self.type, DSetBase):
+            dset_cls = self.type
+            key_names = list(dset_cls.__dobject_key__.keys())
+            print('@@@@@@@@@@@@@@@@@: ', key_names, owner_class)
+            print('@@@Owner PK: : ', owner_class.__dobject_key__)
+            self.type = dset(dset_cls.__dset_item_class__,
+                             _dominion = owner_class,
+                             _key = key_names,
+                             **self.type.__dset_links__
+                             )
+
+            self.default = self.type # the inializer of dset
+
+    def initialize(self, instance):
+        """  """
+
+        if issubclass(self.type, DSetBase):
+            print(22333, self.name, self.type,)
+            return self.type(_dominion=instance)
+
+        if isinstance(self.default, type):
+            return self.default()
+
+        if isinstance(self.default, (str, int, float, Decimal,
+                                       date, time, datetime,
+                                       timedelta)):
+            return self.default
+
+        errmsg = "Unknown the default value: %r" % self.default
+        raise ValueError(errmsg)
+
+
     def set_value_unguardedly(self, instance, value):
 
         attr_values  = instance.__value_dict__
@@ -67,47 +100,9 @@ class datt(DAttribute):
 
         attr_values[self.name] = value
 
+    def copy(self):
 
-class AggregateAttr(DAggregate):
-    """The aggregate attribute of domain object"""
-
-    __slots__ = ('name', 'agg_type', 'item_type', 'is_identity', 'doc',
-                    '_item_primary_key', '_item_primary_key_class')
-
-    def __init__(self, agg_type, item_type, doc=None,
-                    primary_key=None, primary_key_class=None):
-
-        self.agg_type = agg_type
-        self.item_type = item_type
-        self.is_identity = False
-        self.doc = doc
-        self._item_primary_key = primary_key
-        self._item_primary_key_class = primary_key_class
-
-    def __get__(self, instance, owner):
-        if instance is None: # get attribute
-            return self
-
-        # get value of attribute
-        value = instance.__value_dict__.get(self.name, None)
-        if value is None:
-            value = self.agg_type(item_type=self.item_type,
-                                  primary_key=self._item_primary_key)
-            instance.__value_dict__[self.name] = value
-
-        return value
-
-    def set_value_unguardedly(self, instance, value):
-
-        dset_value = getattr(instance, self.name)
-        if not isinstance(value, Iterable):
-            errmsg = ("The assigned object (%s) to aggregate attribute "
-                      "'%s' is not iterable")
-            errmsg %= (value.__class__.__name__, self.name)
-            raise TypeError(errmsg)
-
-        dset_value.clear()
-        for r in value:
-            dset_value.add(r)
-
-    __set__ = set_value_unguardedly
+        obj = datt(type=self.type, default=self.default, doc=self.doc,
+                                **self._kwargs)
+        obj.owner_class  = self.owner_class
+        return obj

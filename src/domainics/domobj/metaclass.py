@@ -11,8 +11,8 @@ from datetime import datetime, date
 
 from .typing import DSet, DObject, PrimaryKeyTuple, AnyDObject
 from .typing import DAttribute, DAggregate
-from .typing import cast_attr_value
-from .dattr import AggregateAttr
+from .typing import cast_attr_value, parse_attr_value_many
+# from .dattr import AggregateAttr
 from .reshape import ReshapeDescriptor
 
 
@@ -45,52 +45,21 @@ class DObjectMetaClass(type):
             if attrs is not None:
                 value_attrs.update(attrs)
 
-        primary_key = class_dict.pop('__dobject_key__', None)
-
         attributes = OrderedDict()
         for attr_name, descriptor in class_dict.items():
-
-            if isinstance(descriptor, DAttribute):
-                pass
-            elif isinstance(descriptor, DSet):
-                # In class-block, dset object is used,
-                # replace it with AggregateAttr
-                descriptor = AggregateAttr(descriptor.__class__,
-                                           descriptor.item_type,
-                                           descriptor.__doc__,
-                                           descriptor._item_primary_key,
-                                           descriptor._item_primary_key_class)
-
-                class_dict[attr_name] = descriptor
-            else:
+            if attr_name.startswith('_'):
                 continue
 
-            descriptor.name = attr_name # give the attribute descriptor a name
+            if isinstance(descriptor, DAttribute):
+                descriptor.name = attr_name
+                attributes[attr_name] = descriptor
 
-            attributes[attr_name] = descriptor
+        primary_key = class_dict.pop('__dobject_key__', None)
+        primary_key = parse_attr_value_many(primary_key, '__dobject_key__')
+        pkey_names = set(primary_key.keys())
 
-        pkey_names = set()
-        if primary_key:
-            if isinstance(primary_key, DAttribute):
-                pkey_names.add(primary_key.name)
-            elif isinstance(primary_key, Iterable):
-                for i, attr in enumerate(primary_key):
-                    if isinstance(attr, DAttribute):
-                        pkey_names.add(attr.name)
-                    elif isinstance(attr, str):
-                        attr = attributes.get(attr, None)
-                        if attr is None:
-                            errmsg = "No attribute names '%s'" % attr
-                            raise TypeError(errmsg)
-                        pkey_names.add(attr.name)
-                    else:
-                        errmsg = "The %d-th element in __dobject_key__ should"
-                        errmsg += "a attribute or attribute name"
-                        errmsg %= i
-                        raise TypeError(errmsg)
-            else:
-                raise TypeError('__dobject_key__ should be a DAttribute object '
-                                'or an iterable of DAttribute object')
+
+        #----------------------------------------------------------------------
 
         if pkey_names:
             # If available, the primary key declaration overrides parent's
@@ -101,21 +70,28 @@ class DObjectMetaClass(type):
                     value_attrs[attr_name] = attr
                     value_attrs.move_to_end(attr_name, last=Fasle)
 
-        for attr in attributes.values():
+
+        for attr_name, attr in attributes.items():
             if attr.name in pkey_names:
-                pkey_attrs[attr.name] = attr
+                pkey_attrs[attr_name] = attr
             else:
-                value_attrs[attr.name] = attr
+                value_attrs[attr_name] = attr
+
+
+        class_dict['__dobject_key__'] = pkey_attrs
+        class_dict['__dobject_att__'] = value_attrs
+        class_dict['__dobject_origin_class__'] = None
+        class_dict['__dobject_mapping__'] = OrderedDict()
+        class_dict['_re'] =  ReshapeDescriptor()
 
         cls = type.__new__(metacls, classname, bases, class_dict)
 
-        setattr(cls, '__dobject_key__', pkey_attrs)
-        setattr(cls, '__dobject_key_class__', _make_pkey_class(cls))
-        setattr(cls, '__dobject_att__', value_attrs)
-        setattr(cls, '__dobject_origin_class__', None)
-        setattr(cls, '__dobject_mapping__', OrderedDict())
+        # After class is created, ...
+        # Becasuse the dset aggregate requires the complete class info.
+        for attr_name, attr in attributes.items():
+            attr.setup(cls, attr_name) # set owner and other something...
 
-        setattr(cls, '_re', ReshapeDescriptor())
+        setattr(cls, '__dobject_key_class__', _make_pkey_class(cls))
 
         return cls
 

@@ -10,14 +10,14 @@ import sys
 # from ._reshape import reshape
 
 from .dobject import dobject
-from .typing import DObject, DSet, DAttribute, AnyDObject
-from .typing import parse_attr_value_many
+from .typing import DObject, DSet, DSetBase, DAttribute, AnyDObject
+from .typing import parse_attr_value_many, consume_kwargs
 from .metaclass import _make_pkey_class, DObjectMetaClass
 
 
 _dset_class_tmpl = """\
 class {typename}(DSetBase):
-    pass
+    __dobject_key__ = dobject_key
 """
 def dset(*args, **kwargs):
 
@@ -26,23 +26,67 @@ def dset(*args, **kwargs):
         raise ValueError(errmsg)
 
     item_type = args[0]
+    if not issubclass(item_type, (DObject, DSetBase)):
+        err = "The item of a dset must be a dobject or dset, not class '%s'"
+        err %= item_type.__name__
+        raise TypeError(err)
 
-    dset_key = OrderedDict()
-    dominion_class = None
+    if not item_type.__dobject_key__ :
+        err = "The key of item type '%s' is required" % item_type.__name__
+        raise TypeError(err)
 
+
+    dominion_class = consume_kwargs(kwargs, '_dominion', (DObject, DSetBase))
+    type_name = consume_kwargs(kwargs, '_name', (str,))
+
+
+    undefined_attrs = set()
+    key_attrs = OrderedDict()
     arg_name = '_key'
     if arg_name in kwargs:
         arg_value = parse_attr_value_many(kwargs.pop(arg_name), arg_name)
-        dset_key.update(arg_value)
+        for attr_name, attr in arg_value.items():
+            print(attr_name, attr)
+            if attr is None:
+                undefined_attrs.add(attr_name)
+                continue
 
+            key_attrs[attr_name] = attr.copy()
 
-    arg_name = '_dominion'
-    if arg_name in kwargs:
-        arg_value = kwargs.pop(arg_name)
-        if not isinstance(arg_value, type):
-            raise  ValueError()
-        dominion_class = arg_value
+            if attr.owner_class is not None:
+                if dominion_class is None:
+                    dominion_class = attr.owner_class
+                else:
+                    if not issubclass(dominion_class, attr.owner_class):
+                        err = ("Type Conflicts. The dominion class "
+                               "'%s' (at %d) and "
+                               " %s (at %d) that defines attribute %s are "
+                               "inconstinst")
+                        err %= (dominion_class.__name__,
+                                id(dominion_class),
+                                attr.owner_class.__name__,
+                                id(attr.owner_class),
+                                attr_name)
+                        raise ValueError(err)
 
+    if not key_attrs and dominion_class: #
+        for attr_name, attr in dominion_class.__dobject_key__.items():
+            key_attrs[attr_name] = attr.copy()
+
+    if dominion_class and undefined_attrs:
+        # try find attribute definition from dominion class
+        for attr_name in list(undefined_attrs):
+            attr = dominion_class.__dobject_key__[attr_name]
+            key_attrs[attr_name] = attr.copy()
+            undefined_attrs.remove(attr_name)
+
+    if undefined_attrs:
+        errmsg = "There are undefined attributes: "
+        errmsg += ', '.join(undefined_attrs)
+        raise ValueError(errmsg)
+
+    for attr_name in key_attrs :
+        attr = key_attrs[attr_name]
 
     links = OrderedDict()
     for attr_name, attr in kwargs.items():
@@ -51,27 +95,41 @@ def dset(*args, **kwargs):
             errmsg %= attr_name
             raise ValueError(errmsg)
 
-    if not dset_key and dominion_class:
-        dset_key = dominion_class.__dobject_key__
+        links[attr_name] = attr
+
+    if not key_attrs and dominion_class:
+        key_attrs = dominion_class.__dobject_key__
 
     # ----------------------------------------------------------------------
 
-    typename = item_type.__name__ + '_dset'
-    class_code = _dset_class_tmpl.format(typename = typename)
+    type_name = item_type.__name__
 
-    namespace = dict(DSet = DSet, DSetBase=DSetBase, T = DObject)
+    if type_name is None:
+        type_name = item_type.__name__
+        if not type_name.endswith('_dset'):
+            type_name += '_dset'
+
+    class_code = "class {name}(DSetBaseImpl):\n".format(name = type_name)
+
+    for attr_name in key_attrs:
+        class_code += ' ' * 4
+        class_code += "{name} = key_attrs['{name}']\n".format(name=attr_name)
+
+    class_code += "    __dobject_key__ = list(key_attrs.keys())"
+
+    #------------------------------------------------------------------------
+
+    namespace = dict(DSetBaseImpl = DSetBaseImpl, key_attrs = key_attrs)
+
     exec(class_code, namespace)
-    dset_cls = namespace[typename]
-    # pkey_cls.__module__ = dobj_cls.__module__
+    dset_cls = namespace[type_name]
 
-    for attr_name, attr in dset_key.items():
+    for attr_name, attr in key_attrs.items():
         setattr(dset_cls, attr_name, attr)
 
     dset_cls.__dset_item_class__ = item_type
+    dset_cls.__dset_links__ = links
     dset_cls.__dominion_class__ = dominion_class
-    dset_cls.__dobject_key__ = dset_key
-    dset_cls.__dobject_key_class__ = _make_pkey_class(dset_cls)
-    dset_cls.__dobject_att__ = OrderedDict()
 
     try:
         frame = sys._getframe(1)
@@ -79,11 +137,9 @@ def dset(*args, **kwargs):
     except (AttributeError, ValueError):
         pass
 
-
     return dset_cls
 
-
-class DSetBase(dobject):
+class DSetBaseImpl(DSetBase, dobject):
     """The set of dobjects.
     """
 
@@ -94,17 +150,36 @@ class DSetBase(dobject):
         if arg_name in kwargs:
             dominion_obj = kwargs.pop(arg_name)
             if not isinstance(dominion_obj, DObject):
-                raise ValueError()
+                errmsg = "The dominion object should be a dobject, not ''"
+                errmsg %= (dominion_obj.__class__.__module__
+                                        + dominion_obj.__class__.__name__)
+                raise ValueError(errmsg)
 
+        item_iterable = None
         origin_obj = None
         if args:
-            if len(args) == 1:
-                origin_obj += args[0]
+            if len(args) != 1:
+                raise ValueError('Only one positional argument is required')
+
+            if isinstance(args[0], DSetBase):
+                origin_obj = item_iterable = args[0]
+            elif isinstance(args[0], Iterable):
+                item_iterable = args[0]
             else:
-                raise ValueError('')
+                err = ("The 1st positional argument must be dset or "
+                       "iterable of %s")
+                err %= self.__dset_item_type__.__name__
+                raise TypeError(err)
 
         if dominion_obj is not None:
-            orig_domi_obj = dominion_obj
+            if isinstance(dominion_obj, cls.__dominion_class__):
+                orig_domi_obj = dominion_obj
+            else:
+                errmsg = "The type dominion should be a object of %s, not %s"
+                errmsg %= (cls.__dominion_class__,
+                            dominion_obj.__class__ .__module__ + '.' +
+                            dominion_obj.__class__.__name__)
+                raise TypeError(errmsg)
 
         elif origin_obj is not None:
             orig_domi_obj = origin_obj
@@ -112,7 +187,9 @@ class DSetBase(dobject):
         else:
             orig_domi_obj = None
 
+
         if orig_domi_obj is not None:
+            domi_cls = cls.__dominion_class__
             if isinstance(orig_domi_obj, Mapping):
                 for attr_name, attr in cls.__dobject_key__.items():
                     if attr_name in kwargs:
@@ -132,32 +209,22 @@ class DSetBase(dobject):
 
                     kwargs[attr_name] = getattr(orig_domi_obj, attr_name)
 
-
+        for attr_name in kwargs:
+            if attr_name not in cls.__dobject_key__:
+                err = "Given attribute %s is unkown or not the key attribute"
+                err += " in dset"
+                err %= (attr_name)
+                raise ValueError(err)
 
         instance = super(DSetBase, cls).__new__(cls, **kwargs)
 
         instance_setter = super(dobject, instance).__setattr__
         instance_setter('__dset_item_dict__',  OrderedDict())
-        instance_setter('__dominion_object__',  None)
+        instance_setter('__dominion_object__',  dominion_obj)
 
-
-
-
-        for attr_name in kwargs.keys():
-            attr = cls.__dobject_key__.get(attr_name, None)
-            if attr is not None:
-                attr_value = kwargs[attr_name]
-                print(555, attr_value)
-                attr.set_value_unguardedly(instance, attr_value)
-            else:
-                errmsg = "Unknown attribute: " + attr_name
-                raise ValueError(errmsg)
-
-        if origin_obj is not None:
-            for item in origin_obj:
+        if item_iterable is not None:
+            for item in item_iterable:
                 instance._add(item)
-
-        print(666, getattr(instance, 'a', None))
 
         return instance
 
