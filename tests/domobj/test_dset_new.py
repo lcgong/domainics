@@ -132,7 +132,7 @@ def test_dset_clone():
 
 
 # @pytest.mark.skipif
-def test_dset_links():
+def test_dset_links_1():
 
     class A(dobject):
         a = datt(int)
@@ -149,6 +149,21 @@ def test_dset_links():
     sl = list(s1)
     assert s1.a == 101 and sl[0].y == 101 and sl[1].y == 101
 
+    print(s1)
+    #-------------------------------------------------------------------
+    class B(dobject):
+        a = datt(int) # the same name with dset key
+        x = datt(int)
+        y = datt(int)
+        __dobject_key__ = [x]
+
+    BSet = dset(B, _key=A.a, a='y') # link
+    s1 = BSet([B(x=1, y=11), B(x=2, y=22)], a=101)
+    sl = list(s1)
+    assert s1.a == 101 and sl[0].y == 101 and sl[1].y == 101
+    assert sl[0].a is None and sl[1].a is None
+
+    print(s1)
 
 def test_dset_datt():
     class Item(dobject):

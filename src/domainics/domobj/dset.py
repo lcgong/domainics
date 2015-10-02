@@ -240,28 +240,52 @@ class DSetBaseImpl(DSetBase, dobject):
         """
 
         item_cls = self.__dset_item_class__
+        dset_cls = self.__class__
 
-        obj = item_cls(obj) # clone it
-        key = obj.__dobject_key__
+        # obj = item_cls(obj) # complete clone it
+        # key = obj.__dobject_key__
 
-        links = self.__class__.__dset_links__
-        for attr_name in iter_chain(item_cls.__dobject_key__,
-                                    item_cls.__dobject_att__):
-            attr_value = None
-            if attr_name in links:
-                attr_value = getattr(self, links.get(attr_name))
-                setattr(obj, attr_name, attr_value)
+        # ------------------------------------------------------------
+        subst_mapping = getattr(dset_cls, '_dobject_subst_mapping', None)
+        if subst_mapping is None:
+            seen = set()
+            subst_mapping = [] # [(item_attr_name, set_attr_name)]
+            for item_attr_n, dset_attr_n in dset_cls.__dset_links__.items():
+                subst_mapping.append((item_attr_n, dset_attr_n))
+                seen.add(item_attr_n)
+                seen.add(dset_attr_n) # avoid copying with dset_attr_n
 
-        for attr_name in self.__class__.__dobject_key__:
-            if not hasattr(obj, attr_name):
-                continue
+            for attr_name in self.__class__.__dobject_key__:
+                if attr_name in seen or not hasattr(obj, attr_name):
+                    continue
 
+                subst_mapping.append((attr_name, attr_name))
 
+            setattr(dset_cls, '_dobject_subst_mapping', subst_mapping)
 
-            attr_value = getattr(self, attr_name)
-            setattr(obj, attr_name, attr_value)
+        subst_values = dict((item_attr_name, getattr(self, dset_attr_name))
+                                for item_attr_name, dset_attr_name
+                                    in subst_mapping)
 
-        self.__dset_item_dict__[key] = obj
+        obj = item_cls(obj, **subst_values) # clone it and replace its values
+
+        # links = self.__class__.__dset_links__
+        # for attr_name in iter_chain(item_cls.__dobject_key__,
+        #                             item_cls.__dobject_att__):
+        #     attr_value = None
+        #     if attr_name in links:
+        #         subst_attr_name = links.get(attr_name)
+        #         attr_value = getattr(self, subst_attr_name)
+        #         setattr(obj, attr_name, attr_value)
+        #
+        # for attr_name in self.__class__.__dobject_key__:
+        #     if not hasattr(obj, attr_name):
+        #         continue
+        #
+        #     attr_value = getattr(self, attr_name)
+        #     setattr(obj, attr_name, attr_value)
+
+        self.__dset_item_dict__[obj.__dobject_key__] = obj
 
         return self
 
