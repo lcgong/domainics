@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 from datetime import date, datetime
 
 
-from domainics.domobj import DSet, DObject, dset, dobject, datt, reshape
+from domainics.domobj import DSet, DObject, dset, dobject, datt
 from domainics.tornice import rest, route_base
 from domainics.tornice.client import rest_client, restcli
 
@@ -16,7 +16,7 @@ class A(dobject):
     sn = datt(str)
     name = datt(str)
 
-AA = reshape(A, _primary_key=['sn'])
+AA = A._re(_key=['sn'])
 
 @rest.GET(r'abc/{sn:int}/{path:path}')
 def hello(sn: int, name, val: float, d1: datetime, path: str, obj: DSet[AA]):

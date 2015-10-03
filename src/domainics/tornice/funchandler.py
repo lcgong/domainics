@@ -12,8 +12,7 @@ from tornado.web import RequestHandler, HTTPError
 from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
-from ..domobj import dset, dobject, reshape
-from ..domobj import DSet, DObject
+from ..domobj import dset, dobject, DSetBase, DObject, DSet
 from ..error  import AuthenticationError
 from .. import json as _json
 
@@ -142,20 +141,21 @@ class BaseFuncRequestHandler(RequestHandler):
                 arg_val = self.get_argument(arg_name, None)
 
             if ann_type != inspect._empty:
-                if hasattr(ann_type, '__origin__'): # maybe DSet[DObject]
-                    if ann_type.__origin__ == DSet[Any].__origin__:
-                        if len(ann_type.__parameters__) != 1:
-                            errmsg = ("Argument %s's type is required "
-                                       "like DSet[T]")
-                            errmsg %= arg_name
-                            raise TypeError(errmsg)
+                print(77777, ann_type.__name__, )
+                if issubclass(ann_type, DSet[DObject]):
+                    # if ann_type.__origin__ == DSet[Any].__origin__:
+                        # if len(ann_type.__parameters__) != 1:
+                        #     errmsg = ("Argument %s's type is required "
+                        #                "like DSet[T]")
+                        #     errmsg %= arg_name
+                        #     raise TypeError(errmsg)
+                        #
+                    item_type = ann_type.__parameters__[0]
 
-                        item_type = ann_type.__parameters__[0]
+                    if arg_name != 'json_arg' :
+                        arg_val = self._read_json_object()
 
-                        if arg_name != 'json_arg' :
-                            arg_val = self._read_json_object()
-
-                        arg_val = dset(item_type, arg_val)
+                    arg_val = dset(item_type)(arg_val)
 
                 elif issubclass(ann_type, DObject):
                     if arg_name != 'json_arg' :
@@ -271,7 +271,7 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
     def do_handler_func(self, *args, **kwargs):
         obj = super(RESTFuncRequestHandler, self).do_handler_func(*args, **kwargs)
 
-        if not isinstance(obj, (list, tuple, dset)):
+        if not isinstance(obj, (list, tuple, DSetBase)):
             obj = [obj] if obj is not None else []
 
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
