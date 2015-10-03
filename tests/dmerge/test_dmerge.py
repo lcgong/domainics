@@ -28,7 +28,7 @@ class t_a(dtable):
     __dobject_key__ = [a, b]
 
 @transaction
-def test_diff():
+def test_dobject_dmerge():
 
     # orginal data
     ASet = dset(t_a)

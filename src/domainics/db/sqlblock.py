@@ -80,11 +80,11 @@ def make_record_dtable(dobj_cls):
         #     yield dobj_cls(**zip(colnames, (row[i] for i in colidxs))
 
 class BaseSQLBlock:
-    def __init__(self, dbtype, dsn='DEFAULT', autocommit=False, record_type=None):
+    def __init__(self, dbms, dsn='DEFAULT', autocommit=False, record_type=None):
 
         self._record_type = record_type or _default_record_type
 
-        self.dbtype = dbtype
+        self.dbms = dbms
         self.dsn = dsn
         self.autocommit = autocommit
 

@@ -234,6 +234,72 @@ class DSetBaseImpl(DSetBase, dobject):
 
         return instance
 
+    def _item_value_subst(self):
+        dset_cls = self.__class__
+        item_cls = self.__dset_item_class__
+
+        subst_mapping = getattr(dset_cls, '_dobject_subst_mapping', None)
+
+        if subst_mapping is not None:
+            return subst_mapping
+
+        seen = set()
+        subst_mapping = [] # [(item_attr_name, set_attr_name)]
+        for item_attr_n, dset_attr_n in dset_cls.__dset_links__.items():
+            subst_mapping.append((item_attr_n, dset_attr_n))
+            seen.add(item_attr_n)
+            seen.add(dset_attr_n) # avoid copying with dset_attr_n
+
+        for attr_name in self.__class__.__dobject_key__:
+            if attr_name in seen:
+                continue
+
+            if (attr_name not in item_cls.__dobject_key__ and
+                    attr_name not in item_cls.__dobject_att__):
+                continue
+
+            subst_mapping.append((attr_name, attr_name))
+
+
+        subst_values = dict((item_attr_name, getattr(self, dset_attr_name))
+                                for item_attr_name, dset_attr_name
+                                    in subst_mapping)
+
+        setattr(dset_cls, '_dobject_subst_mapping', subst_values)
+
+        return subst_values
+
+    def _index_key(self, obj):
+        """get key of a object or mapping"""
+
+
+        key_cls = self.__dset_item_class__.__dobject_key_class__
+        value_subst = self._item_value_subst()
+        print(123, value_subst)
+
+        if isinstance(obj, DObject):
+            values = []
+            for attr_name in key_cls._attr_names:
+                if attr_name in value_subst:
+                    values.append(value_subst[attr_name])
+                else:
+                    values.append(getattr(obj, attr_name))
+
+            return key_cls(tuple(values))
+
+        elif isinstance(obj, Mapping):
+            values = []
+            for attr_name in key_cls._attr_names:
+                if attr_name in value_subst:
+                    values.append(value_subst[attr_name])
+                else:
+                    values.append(obj[attr_name])
+
+            return key_cls(tuple(values))
+
+        else:
+            raise ValueError()
+
     def _add(self, obj):
         """
         If the identity of obj has been added, replace the old one with it.
@@ -242,48 +308,11 @@ class DSetBaseImpl(DSetBase, dobject):
         item_cls = self.__dset_item_class__
         dset_cls = self.__class__
 
-        # obj = item_cls(obj) # complete clone it
-        # key = obj.__dobject_key__
+        subst_values = self._item_value_subst()
 
         # ------------------------------------------------------------
-        subst_mapping = getattr(dset_cls, '_dobject_subst_mapping', None)
-        if subst_mapping is None:
-            seen = set()
-            subst_mapping = [] # [(item_attr_name, set_attr_name)]
-            for item_attr_n, dset_attr_n in dset_cls.__dset_links__.items():
-                subst_mapping.append((item_attr_n, dset_attr_n))
-                seen.add(item_attr_n)
-                seen.add(dset_attr_n) # avoid copying with dset_attr_n
-
-            for attr_name in self.__class__.__dobject_key__:
-                if attr_name in seen or not hasattr(obj, attr_name):
-                    continue
-
-                subst_mapping.append((attr_name, attr_name))
-
-            setattr(dset_cls, '_dobject_subst_mapping', subst_mapping)
-
-        subst_values = dict((item_attr_name, getattr(self, dset_attr_name))
-                                for item_attr_name, dset_attr_name
-                                    in subst_mapping)
 
         obj = item_cls(obj, **subst_values) # clone it and replace its values
-
-        # links = self.__class__.__dset_links__
-        # for attr_name in iter_chain(item_cls.__dobject_key__,
-        #                             item_cls.__dobject_att__):
-        #     attr_value = None
-        #     if attr_name in links:
-        #         subst_attr_name = links.get(attr_name)
-        #         attr_value = getattr(self, subst_attr_name)
-        #         setattr(obj, attr_name, attr_value)
-        #
-        # for attr_name in self.__class__.__dobject_key__:
-        #     if not hasattr(obj, attr_name):
-        #         continue
-        #
-        #     attr_value = getattr(self, attr_name)
-        #     setattr(obj, attr_name, attr_value)
 
         self.__dset_item_dict__[obj.__dobject_key__] = obj
 
@@ -340,49 +369,25 @@ class DSetBaseImpl(DSetBase, dobject):
 
     def __getitem__(self, index):
 
-        if isinstance(index, DObject):
-            obj = self.__dset_item_dict__.get(index.__dobject_key__, None)
-            if obj is not None:
-                return obj
-
-        elif isinstance(index, self.__dset_item_class__.__dobject_key_class__):
-            obj = self.__dset_item_dict__.get(index, None)
-            if obj is not None:
-                return obj
-
-        else:
-            index = self.__dset_item_class__(index)
-            obj = self.__dset_item_dict__.get(index.__dobject_key__, None)
-            if obj is not None:
-                return obj
+        index = self._index_key(index)
+        obj = self.__dset_item_dict__.get(index, None)
+        if obj is not None:
+            return obj
 
         return self.__dset_item_class__()
 
     def __delitem__(self, index):
 
-        if isinstance(index, DObject):
-            del self.__dset_item_dict__[index.__dobject_key__]
+        index = self._index_key(index)
+        del self.__dset_item_dict__[index]
 
-        elif isinstance(index, self.__dset_item_class__.__dobject_key_class__):
-            del self.__dset_item_dict__[index]
-
-        else:
-            index = self.__dset_item_class__(index)
-            del self.__dset_item_dict__[index.__dobject_key__]
 
     def __setitem__(self, index, value):
 
-        item_type = self.__dset_item_class__
+        item_class = self.__dset_item_class__
 
-        if isinstance(index, DObject):
-            self.__dset_item_dict__[index.__dobject_key__] = item_type(value)
-
-        elif isinstance(index, item_type.__dobject_key_class__):
-            self.__dset_item_dict__[index] = item_type(value)
-
-        else:
-            index = item_type(index)
-            self.__dset_item_dict__[index.__dobject_key__] = item_type(value)
+        index = self._index_key(index)
+        self.__dset_item_dict__[index] = item_class(value)
 
 
     def __hash__(self):

@@ -48,23 +48,24 @@ class dobject(DObject, metaclass=DObjectMetaClass):
             elif isinstance(source_obj, DObject):
                 if (cls.__dobject_origin_class__ and
                         isinstance(source_obj, cls.__dobject_origin_class__)):
-                    subst_mapping = cls.__dobject_mapping__
-                    substituted = set(cls.__dobject_mapping__.values())
+                    subst_mapping = {}
+                    for o_name, n_name in cls.__dobject_mapping__.items():
+                        subst_mapping[n_name] = o_name
+                        if n_name not in cls.__dobject_mapping__:
+                            # _subst=dict(a=b*, b=a) if o_name in mapping
+                            subst_mapping[o_name] = None # mark it not to clone
+
                 else:
                     subst_mapping = {}
-                    substituted = set()
-
 
                 for attr_name, attr in attributes.items():
                     if attr_name in kwargs:
                         continue # this value will be set laterly
 
-                    if attr_name in substituted:
-                        # the attribute is the old name in original obj
-                        continue
-
                     if attr_name in subst_mapping:
                         src_attr_name = subst_mapping[attr_name]
+                        if src_attr_name is None:
+                            continue
                     else:
                         src_attr_name = attr_name
 
@@ -104,9 +105,7 @@ class dobject(DObject, metaclass=DObjectMetaClass):
             seen.add(arg_name)
 
         for attr_name, attr, attr_val in aggregates:
-            print(5551, id(instance), id(attr_val.__dominion_object__), attr_val)
             attr_val = attr.type(attr_val, _dominion = instance)
-            print(5552, id(attr_val.__dominion_object__),  attr_val)
 
         # # set default values for these left parameters
         # for attr_name, attr in parameters.items():

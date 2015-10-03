@@ -197,10 +197,12 @@ def _reshape_class(orig_cls, *args, **kwargs):
     for attr_name, attr in iter_chain(orig_cls.__dobject_key__.items(),
                                       orig_cls.__dobject_att__.items()):
 
-            if attr_name in substituted:
-                attributes[substituted[attr_name]] = attr
-            else:
-                attributes[attr_name] = attr
+        attr = attr.copy()
+        attr.owner_class = None
+        if attr_name in substituted:
+            attributes[substituted[attr_name]] = attr
+        else:
+            attributes[attr_name] = attr
 
     # ONLY substitute the original object's attribute names
     for old_attr_name, new_attr_name  in substituted.items():
@@ -290,9 +292,9 @@ def _reshape_class(orig_cls, *args, **kwargs):
 
     new_cls.__module__ = sys._getframe(2).f_globals.get('__name__', '__main__')
 
-    setattr(new_cls, '__origin_classes__', tuple([orig_cls] + combined))
+    setattr(new_cls, '__dobject_origin_class__', tuple([orig_cls] + combined))
     if substituted:
-        setattr(new_cls, '__subst_mapping__', substituted)
+        setattr(new_cls, '__dobject_mapping__', substituted)
 
     return new_cls
 
