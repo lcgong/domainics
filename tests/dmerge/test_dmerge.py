@@ -4,8 +4,8 @@ import pytest
 
 from datetime import datetime, date
 from decimal import Decimal
-from domainics.db import dtable, tcol
-from domainics.domobj import dset, reshape
+from domainics.db import dtable
+from domainics.domobj import dset, datt
 
 from domainics.db import DBSchema, set_dsn, transaction, dbc, dmerge
 
@@ -18,12 +18,12 @@ def setup_module(module):
     schema.create()
 
 class t_a(dtable):
-    a = tcol(int)
-    b = tcol(int)
-    c = tcol(int, doc="should be constrained")
-    d = tcol(int)
-    e = tcol(int, doc="should be constrained")
-    f = tcol(int)
+    a = datt(int)
+    b = datt(int)
+    c = datt(int, doc="should be constrained")
+    d = datt(int)
+    e = datt(int, doc="should be constrained")
+    f = datt(int)
 
     __dobject_key__ = [a, b]
 

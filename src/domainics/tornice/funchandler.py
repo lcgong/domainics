@@ -141,7 +141,6 @@ class BaseFuncRequestHandler(RequestHandler):
                 arg_val = self.get_argument(arg_name, None)
 
             if ann_type != inspect._empty:
-                print(77777, ann_type.__name__, )
                 if issubclass(ann_type, DSet[DObject]):
                     # if ann_type.__origin__ == DSet[Any].__origin__:
                         # if len(ann_type.__parameters__) != 1:
@@ -179,55 +178,6 @@ class BaseFuncRequestHandler(RequestHandler):
                 arg_val = param.default
 
             arguments[arg_name] = arg_val
-
-
-            # if 'json_arg' == arg_name:
-            #     # get json argument from body of http message
-            #     arg_val = self.request.body
-            #     # arg_val = self._read_json_object()
-            #
-            # elif arg_name in self.path_signature:
-            #     # get argument value from path arguments
-            #     # arg_type = self.path_signature[arg_name]
-            #     arg_val = kwargs[arg_name]
-            #     # if arg_type != str and arg_val is not None:
-            #     #     arg_val = arg_type(arg_val)
-            #     #
-            #     # print('12', arg_name, arg_type)
-
-            # elif arg_name in self.req_query_args:
-            #     arg_type = self.req_query_args[arg_name]
-            #     arg_val = self.get_argument(arg_name, None)
-            #     if arg_type != str and arg_val is not None:
-            #         arg_val = arg_type(arg_val)
-
-            # elif arg_spec.annotation != inspect._empty:
-            #
-            #     ann = arg_spec.annotation
-            #     if hasattr(ann, '__origin__'): # maybe DSet[DObject]
-            #         if ann.__origin__ == DSet[Any].__origin__:
-            #             if len(ann.__parameters__) != 1:
-            #                 errmsg = ("Argument %s's type is required "
-            #                            "like DSet[T]")
-            #                 errmsg %= arg_name
-            #                 raise TypeError(errmsg)
-            #             item_type = ann.__parameters__[0]
-            #             arg_val = dset(item_type, self._read_json_object())
-            #
-            #     elif issubclass(ann, DObject):
-            #         arg_val = ann(reshape(self._read_json_object()))
-            #     else:
-            #         errmsg = "Unknow type hinting: %s"
-            #         errmsg %= arg_sepc
-            #         raise ValueError(errmsg)
-
-            # else:
-            #     if arg_spec.default is inspect._empty :
-            #         arg_val = None
-            #     else:
-            #         arg_val = param.default
-            #
-            # arguments[arg_name] = arg_val
 
         return arguments
 

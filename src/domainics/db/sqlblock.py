@@ -174,6 +174,8 @@ class BaseSQLBlock:
         _iter = self._iter or self.__iter__()
         try:
             return _iter.__next__()
+        except StopIteration:
+            return None
         finally:
             self._cur_record_type = None
 

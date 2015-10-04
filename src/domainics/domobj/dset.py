@@ -3,6 +3,7 @@
 from collections import OrderedDict
 from collections import namedtuple
 from collections.abc import Iterable, Mapping
+from itertools import islice
 
 import sys
 
@@ -272,10 +273,18 @@ class DSetBaseImpl(DSetBase, dobject):
     def _index_key(self, obj):
         """get key of a object or mapping"""
 
+        if isinstance(obj, int):
+            indice = self.__dset_item_dict__.keys()
+            index = next(islice(indice, obj, obj + 1), None)
+
+            if index is None:
+                raise IndexError('no found index: ' + str(obj))
+                return self.__dset_item_class__()
+
+            return index
 
         key_cls = self.__dset_item_class__.__dobject_key_class__
         value_subst = self._item_value_subst()
-        print(123, value_subst)
 
         if isinstance(obj, DObject):
             values = []
@@ -370,6 +379,7 @@ class DSetBaseImpl(DSetBase, dobject):
     def __getitem__(self, index):
 
         index = self._index_key(index)
+
         obj = self.__dset_item_dict__.get(index, None)
         if obj is not None:
             return obj

@@ -129,7 +129,6 @@ class RouteSpecTable:
 
         # parse the argments in service path
         path_pattern, path_args = _parse_route_rule(route_spec.path)
-        print(666, route_spec.path, path_pattern)
         route_spec.path_signature = path_args
         route_spec.path_pattern = path_pattern
 
@@ -187,7 +186,6 @@ class HTTPRouteSpecDecoratorFactory():
         self.proto = proto
 
     def __call__(self, path, methods=None):
-        print(9999, path)
         route_spec = HTTPRouteSpec(self.proto)
         if methods:
             for method in comma_split(methods):
@@ -264,7 +262,6 @@ def _re_flatten(p):
         return p
 
     def repl(m):
-        # print(m.groups(), len(m.group(1)))
         if len(m.group(1)) % 2:
             return m.group(0)
         else:
@@ -315,7 +312,6 @@ def _parse_route_rule(rule):
     factories = [] # factories to create value object
     nonames   = []
     for argname, mode, conf, seg in _parse_tokens(rule):
-        print('argname=', argname)
         if mode:
             if mode in _route_rule_filters:
                 mask, in_filter, out_filter = _route_rule_filters[mode](conf)
@@ -333,15 +329,6 @@ def _parse_route_rule(rule):
                 pattern += '(?P<%s>%s)' % (argname, mask)
             factories.append((argname, out_filter))
         elif argname:
-            print(argname, re.escape(argname))
-            # pattern += re.escape(argname)
             pattern += argname
-
-    # if nonames:
-    #     errmsg = "These arguments should be named regex: "
-    #     errmsg += ', '.join([
-    #         '[%d:%d](%s)' % (seg[0], seg[1], rule[seg[0]:seg[1]])
-    #         for seg in nonames])
-    #     raise ValueError(errmsg)
 
     return pattern, dict(factories)

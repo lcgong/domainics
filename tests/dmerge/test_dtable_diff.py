@@ -4,8 +4,8 @@ import pytest
 
 from datetime import datetime, date
 from decimal import Decimal
-from domainics.db import dtable, tcol
-from domainics.domobj import dset
+from domainics.db import dtable
+from domainics.domobj import dset, datt
 
 
 
@@ -13,12 +13,12 @@ def setup_module(module):
     print()
 
 class t_a(dtable):
-    a = tcol(int)
-    b = tcol(int)
-    c = tcol(int, doc="should be constrained")
-    d = tcol(int)
-    e = tcol(int, doc="should be constrained")
-    f = tcol(int)
+    a = datt(int)
+    b = datt(int)
+    c = datt(int, doc="should be constrained")
+    d = datt(int)
+    e = datt(int, doc="should be constrained")
+    f = datt(int)
 
     __dobject_key__ = [a, b]
 

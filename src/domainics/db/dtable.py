@@ -19,7 +19,7 @@ class dtable(dobject):
 #         super(tcol, self).__init__(datatype, **kwargs)
 
 
-class DBArray(DSetBase):
+class DBArray(object):
 
     @classmethod
     def __setter_filter__(cls, value):
@@ -39,18 +39,6 @@ def array(item_type, iterable=None, dimensions=1, doc=None):
 
     return type(cls_name, (DBArray,), cls_attrs)
 
-
-class json_object(object):
-    @classmethod
-    def __setter_filter__(cls, value):
-        if value is None:
-            return None
-
-        if issubclass(value.__class__, (list, dict)):
-            return value
-
-        raise ValueError("the assigned value type should be one of"
-                         " 'list', 'dict'")
 
 class json_object(object):
     @classmethod

@@ -4,8 +4,8 @@ import pytest
 
 from datetime import datetime, date
 from decimal import Decimal
-from domainics.db import dtable, tcol
-from domainics.domobj import dset, reshape
+from domainics.db import dtable
+from domainics.domobj import dset, datt
 
 from domainics.db import DBSchema, set_dsn, transaction, dbc, dmerge, drecall
 
@@ -19,19 +19,32 @@ def setup_module(module):
 
 
 class t_b(dtable):
-    a = tcol(int)
-    b = tcol(int)
-    c = tcol(int)
-    d = tcol(int)
+    a = datt(int)
+    b = datt(int)
+    c = datt(int)
+    d = datt(int)
 
     __dobject_key__ = [a, b]
 
 @transaction
 def test_recall1():
 
-    ASet = dset(t_b, _key=dict(a=tcol(int))) # define a key of dset
-    # print('', ASet.__dobject_key__)
-    # print('', ASet.__dset_item_class__.__dobject_key__)
+    ASet = dset(t_b, _key=dict(a=datt(int))) # define a key of dset
+
+    ds1 = ASet(a=11)
+    ds1 += [t_b(b=12, c=13, d= 14), t_b(b=22, c=23, d=24)]
+    dmerge(ds1)
+
+    r1 = drecall(t_b(a=11, b=12))
+    assert r1.a == 11 and r1.b == 12 and r1.c == 13
+    r1 = drecall(t_b(a=99, b=12)) # no found and return empty dobject
+    assert r1 is not None and not bool(r1)
+
+
+@transaction
+def test_recall2():
+
+    ASet = dset(t_b, _key=dict(a=datt(int))) # define a key of dset
 
 
     ds1 = ASet(a=1)

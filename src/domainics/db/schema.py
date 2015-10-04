@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 # from .. import json
 from .sqlblock import transaction, dbc
-from .dtable import dtable, dsequence
+from .dtable import dtable, dsequence, json_object, DBArray
 from ..util     import iter_submodules
 
 

@@ -141,7 +141,6 @@ class Application(tornado.web.Application):
 
 
     def run(self, port=None, host=None):
-        logger.info('DDDD')
 
         if port is not None:
             self.settings['port'] = port
