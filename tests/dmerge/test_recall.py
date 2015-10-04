@@ -11,7 +11,7 @@ from domainics.db import DBSchema, set_dsn, transaction, dbc, dmerge, drecall
 
 def setup_module(module):
     print()
-    set_dsn(sys='postgres', database="demo", host='localhost', user='postgres')
+    set_dsn(sys='postgres', database="ci_test", host='localhost', user='dbo')
     schema = DBSchema()
     schema.add_module(module)
     schema.drop()
@@ -51,5 +51,3 @@ def test_recall1():
     print("O: ", ds0)
     print("N: ", ds1)
     dmerge(ds1, ds0)
-
-    
