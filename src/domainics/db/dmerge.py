@@ -225,7 +225,7 @@ def dmerge(current, origin=None):
             raise TypeError(err)
 
         dos = dset(current.__class__)()
-        dos.add(current)
+        dos._add(current)
         current = dos
 
     if origin is not None and not isinstance(origin, DSetBase):
@@ -235,7 +235,7 @@ def dmerge(current, origin=None):
             raise TypeError(err)
 
         dos = dset(origin.__class__)()
-        dos.add(origin)
+        dos._add(origin)
         origin = dos
 
     if current is None:

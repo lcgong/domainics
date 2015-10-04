@@ -7,16 +7,16 @@ from ..domobj import dobject, dset, DSetBase, datt
 class dtable(dobject):
     pass
 
-class tcol(datt):
-
-    def __init__(self, datatype, len=None, nullable=True, **kwargs):
-        self.len = len
-
-        if issubclass(datatype, dsequence):
-            if kwargs.get('default') is not None or not nullable:
-                kwargs['default'] = datatype
-
-        super(tcol, self).__init__(datatype, **kwargs)
+# class tcol(datt):
+#
+#     def __init__(self, datatype, len=None, nullable=True, **kwargs):
+#         self.len = len
+#
+#         if issubclass(datatype, dsequence):
+#             if kwargs.get('default') is not None or not nullable:
+#                 kwargs['default'] = datatype
+#
+#         super(tcol, self).__init__(datatype, **kwargs)
 
 
 class DBArray(DSetBase):
@@ -52,6 +52,17 @@ class json_object(object):
         raise ValueError("the assigned value type should be one of"
                          " 'list', 'dict'")
 
+class json_object(object):
+    @classmethod
+    def __setter_filter__(cls, value):
+        if value is None:
+            return None
+
+        if issubclass(value.__class__, (list, dict)):
+            return value
+
+        raise ValueError("the assigned value type should be one of"
+                         " 'list', 'dict'")
 
 class dsequence:
     """"""
@@ -65,6 +76,10 @@ class dsequence:
             err = 'dsequence should be integer, not %s'
             err %= value.__class__.__name__
             raise TypeError(err)
+
+    @classmethod
+    def __default_value__(cls):
+        return cls()
 
     @property
     def value(self):
@@ -89,6 +104,12 @@ class dsequence:
 
     def __int__(self):
         return self.value
+
+    def __eq__(self, other):
+        if self.__value is not None and other.__value is not None:
+            return self.__value == other.__value
+
+        return id(self) == id(other)
 
     def __hash__(self):
         return super(dsequence, self).__hash__()

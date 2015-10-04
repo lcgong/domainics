@@ -17,17 +17,16 @@ from .dset import dset
 class datt(DAttribute):
     """Attribute of dobject"""
 
-    __slots__ = ('name', 'type', 'default_expr', 'default', 'doc')
+    __slots__ = ('name', 'type', 'default_expr', 'default', 'len', 'doc')
 
-    def __init__(self, type=object, default=None, doc=None, **kwargs):
-        self.name         = None
-        self.type         = type
-        self.default      = default
-        self.doc          = doc
-        self.owner_class  = None
-
+    def __init__(self, type=object, default=None, len=None, doc=None, **kwargs):
+        self.name = None
+        self.type = type
+        self.len = len
+        self.default = default
+        self.doc = doc
+        self.owner_class = None
         self._kwargs = kwargs
-
 
     def __get__(self, instance, owner):
         if instance is None: # get domain field
@@ -35,9 +34,14 @@ class datt(DAttribute):
 
         attr_value = instance.__value_dict__.get(self.name, None)
 
-        if attr_value is None and self.default is not None:
-            attr_value = self.initialize(instance)
-            self.set_value_unguardedly(instance, attr_value)
+        if attr_value is None:
+            if hasattr(self.type, '__default_value__'):
+                attr_value = self.type.__default_value__()
+                self.set_value_unguardedly(instance, attr_value)
+
+            elif self.default is not None:
+                attr_value = self.initialize(instance)
+                self.set_value_unguardedly(instance, attr_value)
 
         return attr_value
 
