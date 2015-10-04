@@ -93,6 +93,12 @@ class dsequence:
     def __int__(self):
         return self.value
 
+    def __json_object__(self):
+        if self.__value is not None:
+            return int(self)
+
+        return None
+
     def __eq__(self, other):
         if self.__value is not None and other.__value is not None:
             return self.__value == other.__value

@@ -338,7 +338,8 @@ class DSetBaseImpl(DSetBase, dobject):
     def __json_object__(self):
         """export dset object in list"""
 
-        return [item.__json_object__() for item in self.__dset_item_dict__.values()]
+        return [item.__json_object__()
+                    for item in self.__dset_item_dict__.values()]
 
     def __bool__(self):
         return bool(self.__dset_item_dict__)

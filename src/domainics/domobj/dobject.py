@@ -194,35 +194,18 @@ class dobject(DObject, metaclass=DObjectMetaClass):
 
         return False
 
-
-    # def _copy(self):
-    #     self_attrs = getattr(self,   '__value_dict__')
-    #     kwargs = OrderedDict()
-    #     for attr_name in self_attrs:
-    #         value = self_attrs[attr_name]
-    #
-    #         if isinstance(value, DSet) or isinstance(value, dobject):
-    #             value = value.copy()
-    #         else: # some copy
-    #             pass
-    #
-    #         kwargs[attr_name] = value
-    #
-    #     return self.__class__(**kwargs)
-
-    def _export(self):
+    def __json_object__(self):
         """export dobject as list or dict """
 
+        cls = self.__class__
+
         self_attrs = getattr(self,   '__value_dict__')
-        kwargs = OrderedDict()
-        for attr_name in self_attrs:
-            value = self_attrs[attr_name]
+        data = OrderedDict()
+        for attr_name in iter_chain(cls.__dobject_key__, cls.__dobject_att__):
+            attr_value = getattr(self, attr_name)
+            if hasattr(attr_value, '__json_object__'):
+                attr_value = attr_value.__json_object__()
 
-            if isinstance(value, DSet) or isinstance(value, dobject):
-                value = value.export()
-            else: # some copy
-                pass
+            data[attr_name] = attr_value
 
-            kwargs[attr_name] = value
-
-        return kwargs
+        return data
