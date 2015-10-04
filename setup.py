@@ -17,6 +17,7 @@ setup(
     package_dir = {"": "src"},
     zip_safe = False,
     install_requires = ["tornado>=4.2",
+                        "psycopg2>=2.6.1",
                         "arrow>=0.6"],
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
