@@ -13,12 +13,14 @@ def application(request): # create a default web application
 
     return app
 
-from domainics.daemon.server import ApplicationServerProcess
 
 @pytest.fixture(scope="function")
 def app_url(request, application):
 
-    server = ApplicationServerProcess(application, port=8888)
+    from domainics.server import SingleBackgroundProcess
+
+
+    server = SingleBackgroundProcess(application)
     server.start()
 
     def finalizer():

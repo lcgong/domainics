@@ -7,7 +7,7 @@ import signal
 import socket
 import multiprocessing
 
-class ApplicationServerProcess(multiprocessing.Process):
+class SingleBackgroundProcess(multiprocessing.Process):
     """A process-based Simple application server in testing. """
 
     def __init__(self, application, host='localhost', port=None):
@@ -20,14 +20,14 @@ class ApplicationServerProcess(multiprocessing.Process):
 
         self.is_starting_event = multiprocessing.Event()
 
-        super(ApplicationServerProcess, self).__init__()
+        super(SingleBackgroundProcess, self).__init__()
 
     @property
     def logger(self):
         return logging.getLogger('server')
 
     def start(self, async=False):
-        super(ApplicationServerProcess, self).start()
+        super(SingleBackgroundProcess, self).start()
 
         if not async:
             self.is_starting_event.wait() # wait util starting is finished

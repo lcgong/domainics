@@ -140,22 +140,9 @@ class Application(tornado.web.Application):
         bisect.insort_left(handlers, urlspec)
 
 
-    def run(self, port=None, host=None):
-
-        if port is not None:
-            self.settings['port'] = port
-
-        if host is not None:
-            self.settings['host'] = host
-
+    def setup(self):
         self.log_route_handlers()
-
         self.add_handlers(".*$", self._handlers)
-        self.listen(self.settings['port'])
-
-
-        import domainics.ioloop
-        domainics.ioloop.run() # 服务主调度
 
     @property
     def logger(self):
