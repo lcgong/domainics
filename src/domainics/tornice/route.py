@@ -16,7 +16,6 @@ from decimal import Decimal
 from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject
-from ..error  import AuthenticationError
 from .. import json as _json
 
 from urllib.parse import urljoin

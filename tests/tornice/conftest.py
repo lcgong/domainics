@@ -11,7 +11,7 @@ def application(request): # create a default web application
     app.add_module(request.module)
     app.log_route_handlers()
 
-    return app
+    return app 
 
 
 @pytest.fixture(scope="function")
