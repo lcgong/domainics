@@ -54,7 +54,7 @@ class BaseFuncRequestHandler(RequestHandler):
             raise TypeError('principal_id should be str or None ' )
 
         if value is None :
-            self.clear_cookie(self._cookie_name)
+            self.clear_cookie('tornice_principal')
         else:
             # session-only cookie, expires_days=None
             self.set_secure_cookie('tornice_principal', value,
