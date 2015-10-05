@@ -24,6 +24,8 @@ from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
 from .funchandler import BaseFuncRequestHandler, RESTFuncRequestHandler
 
+from .route_path import parse_route_path
+
 
 def route_base(base_path):
 
@@ -127,7 +129,7 @@ class RouteSpecTable:
         route_spec.path = urljoin(self.base_path, route_spec.path)
 
         # parse the argments in service path
-        path_pattern, path_args = _parse_route_rule(route_spec.path)
+        path_pattern, path_args = parse_route_path(route_spec.path)
         route_spec.path_signature = path_args
         route_spec.path_pattern = path_pattern
 
@@ -245,89 +247,89 @@ def _cast_arg_list(arg, filter=None):
 #         route_table = handler_module._module_route_table
 #
 #     return route_table
-
-
-_route_rule_syntax = re.compile('(\\\\*)'
-    '(?:(?::([a-zA-Z_][a-zA-Z_0-9]*)?)'
-    '|({([a-zA-Z_][a-zA-Z_0-9]*)?(?::(str|int|float|path|'
-    '((?:\\\\.|[^\\\\}]+)+)?)?|([^:]+))?}))')
-
-
-# from bottle project
-def _re_flatten(p):
-    """ Turn all capturing groups in a regular expression pattern into
-        non-capturing groups. """
-    if '(' not in p:
-        return p
-
-    def repl(m):
-        if len(m.group(1)) % 2:
-            return m.group(0)
-        else:
-            return m.group(1) + '(?:'
-
-    return re.sub(r'(\\*)(\(\?P<[^>]+>|\((?!\?))', repl, p)
-
-
-_route_rule_filters = {
-    'str'  : lambda conf: (_re_flatten(conf or '[^/]+'), None, str),
-    'int'  : lambda conf: (r'-?\d+', int, int),
-    'float': lambda conf: (r'-?[\d.]+', float, float),
-    'path' : lambda conf: (r'.+?', None, str)
-}
-
-
-def _parse_tokens(rule):
-    offset, prefix = 0, ''
-    for match in _route_rule_syntax.finditer(rule):
-        prefix += rule[offset:match.start()]
-        g = match.groups()
-        if len(g[0]) % 2:  # Escaped wildcard
-            prefix += match.group(0)[len(g[0]):]
-            offset = match.end()
-            continue
-
-        if prefix:
-            yield prefix, None, None, (match.start(), match.end())
-
-
-        if g[1] is None :
-            if g[3] is None:
-                name, filtr, conf = None, 'str', g[6]
-            else:
-                name, filtr, conf = g[3:6]
-        else:
-            name, filtr, conf = g[1], 'str', None
-
-        yield name, filtr, conf or None, (match.start(), match.end())
-        offset, prefix = match.end(), ''
-
-    if offset <= len(rule) or prefix:
-        yield prefix + rule[offset:], None, None, (offset, None)
-
-
-def _parse_route_rule(rule):
-    pattern   = '' # regex with named groups
-    factories = [] # factories to create value object
-    nonames   = []
-    for argname, mode, conf, seg in _parse_tokens(rule):
-        if mode:
-            if mode in _route_rule_filters:
-                mask, in_filter, out_filter = _route_rule_filters[mode](conf)
-            else:
-                mask = mode # default is regex expression
-                out_filter = str
-
-
-            if not argname:
-                nonames.append(seg)
-
-            if argname is None:
-                pattern += '(%s)' % mask
-            else:
-                pattern += '(?P<%s>%s)' % (argname, mask)
-            factories.append((argname, out_filter))
-        elif argname:
-            pattern += argname
-
-    return pattern, dict(factories)
+#
+#
+# _route_rule_syntax = re.compile('(\\\\*)'
+#     '(?:(?::([a-zA-Z_][a-zA-Z_0-9]*)?)'
+#     '|({([a-zA-Z_][a-zA-Z_0-9]*)?(?::(str|int|float|path|'
+#     '((?:\\\\.|[^\\\\}]+)+)?)?|([^:]+))?}))')
+#
+#
+# # from bottle project
+# def _re_flatten(p):
+#     """ Turn all capturing groups in a regular expression pattern into
+#         non-capturing groups. """
+#     if '(' not in p:
+#         return p
+#
+#     def repl(m):
+#         if len(m.group(1)) % 2:
+#             return m.group(0)
+#         else:
+#             return m.group(1) + '(?:'
+#
+#     return re.sub(r'(\\*)(\(\?P<[^>]+>|\((?!\?))', repl, p)
+#
+#
+# _route_rule_filters = {
+#     'str'  : lambda conf: (_re_flatten(conf or '[^/]+'), None, str),
+#     'int'  : lambda conf: (r'-?\d+', int, int),
+#     'float': lambda conf: (r'-?[\d.]+', float, float),
+#     'path' : lambda conf: (r'.+?', None, str)
+# }
+#
+#
+# def _parse_tokens(rule):
+#     offset, prefix = 0, ''
+#     for match in _route_rule_syntax.finditer(rule):
+#         prefix += rule[offset:match.start()]
+#         g = match.groups()
+#         if len(g[0]) % 2:  # Escaped wildcard
+#             prefix += match.group(0)[len(g[0]):]
+#             offset = match.end()
+#             continue
+#
+#         if prefix:
+#             yield prefix, None, None, (match.start(), match.end())
+#
+#
+#         if g[1] is None :
+#             if g[3] is None:
+#                 name, filtr, conf = None, 'str', g[6]
+#             else:
+#                 name, filtr, conf = g[3:6]
+#         else:
+#             name, filtr, conf = g[1], 'str', None
+#
+#         yield name, filtr, conf or None, (match.start(), match.end())
+#         offset, prefix = match.end(), ''
+#
+#     if offset <= len(rule) or prefix:
+#         yield prefix + rule[offset:], None, None, (offset, None)
+#
+#
+# def _parse_route_rule(rule):
+#     pattern   = '' # regex with named groups
+#     factories = [] # factories to create value object
+#     nonames   = []
+#     for argname, mode, conf, seg in _parse_tokens(rule):
+#         if mode:
+#             if mode in _route_rule_filters:
+#                 mask, in_filter, out_filter = _route_rule_filters[mode](conf)
+#             else:
+#                 mask = mode # default is regex expression
+#                 out_filter = str
+#
+#
+#             if not argname:
+#                 nonames.append(seg)
+#
+#             if argname is None:
+#                 pattern += '(%s)' % mask
+#             else:
+#                 pattern += '(?P<%s>%s)' % (argname, mask)
+#             factories.append((argname, out_filter))
+#         elif argname:
+#             pattern += argname
+#
+#     return pattern, dict(factories)
