@@ -19,7 +19,7 @@ from .reshape import ReshapeDescriptor
 _keywords = set(["__module__", "__qualname__", "__new__", "__setattr__",
                  "__repr__", "__eq__", "__bool__", "__doc__", "__iter__",
                  "__getitem__", "__delitem__", "__setitem__", "__hash__",
-                 "__iadd__",
+                 "__iadd__", "__table_name__",
                  '_item_value_subst', '_index_key',
                  "_export", "_add", "_clear", "__json_object__", "__len__",
                  "__dobject_key__", "__dobject_att__", "__dobject_origin_class__", "__dobject_mapping__", "_re"])

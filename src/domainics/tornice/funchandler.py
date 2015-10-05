@@ -142,13 +142,7 @@ class BaseFuncRequestHandler(RequestHandler):
 
             if ann_type != inspect._empty:
                 if issubclass(ann_type, DSet[DObject]):
-                    # if ann_type.__origin__ == DSet[Any].__origin__:
-                        # if len(ann_type.__parameters__) != 1:
-                        #     errmsg = ("Argument %s's type is required "
-                        #                "like DSet[T]")
-                        #     errmsg %= arg_name
-                        #     raise TypeError(errmsg)
-                        #
+
                     item_type = ann_type.__parameters__[0]
 
                     if arg_name != 'json_arg' :
@@ -160,7 +154,7 @@ class BaseFuncRequestHandler(RequestHandler):
                     if arg_name != 'json_arg' :
                         arg_val = self._read_json_object()
 
-                    arg_val = ann_type(reshape(arg_val))
+                    arg_val = ann_type(arg_val)
                 else:
                     if issubclass(ann_type, datetime):
                         arg_val = arrow.get(arg_val).datetime

@@ -28,7 +28,6 @@ _request_handler = pillar_class(tornado.web.RequestHandler)(_pillar_history)
 
 
 from collections import OrderedDict
-from .route import _parse_route_rule
 
 class OrderedURLSpec(tornado.web.URLSpec):
 

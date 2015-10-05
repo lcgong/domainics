@@ -25,8 +25,13 @@ def _recall_dobject(obj):
     obj_cls = obj.__class__
     col_names = tuple(iter_chain(obj_cls.__dobject_key__, obj.__dobject_att__))
 
+    if hasattr(obj_cls, '__table_name__'):
+        table_name = obj_cls.__table_name__
+    else:
+        table_name = obj.__class__.__name__
+
     sql = "SELECT " + ','.join(col_names) + " FROM "
-    sql += obj.__class__.__name__ + " WHERE "
+    sql += table_name + " WHERE "
     sql += ' AND '.join( pk_colname + "=%s"
                             for pk_colname in obj_cls.__dobject_key__)
 
@@ -44,8 +49,11 @@ def _recall_dobject(obj):
 def _recall_dset(obj):
 
     item_cls = obj.__dset_item_class__
-    tbl_name = item_cls.__name__
 
+    if hasattr(item_cls, '__table_name__'):
+        table_name = item_cls.__table_name__
+    else:
+        table_name = obj.__class__.__name__
 
     pk_names = []
 
@@ -53,7 +61,7 @@ def _recall_dset(obj):
                                         item_cls.__dobject_att__))
 
 
-    sql = "SELECT " + ', '.join(col_names) + " FROM " + tbl_name
+    sql = "SELECT " + ', '.join(col_names) + " FROM " + table_name
 
     if obj.__dobject_key__:
         sql += '\nWHERE '
