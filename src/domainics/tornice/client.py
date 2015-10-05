@@ -76,7 +76,7 @@ class RESTfulClient:
 
         if post_args is not None:
             headers['Content-type'] = 'application/x-www-form-urlencoded'
-            body = urllib.parse.urlencode(qs_args).encode('UTF-8')
+            body = urllib.parse.urlencode(post_args).encode('UTF-8')
 
 
         req = urllib.request.Request(req_url, body, headers=headers)
@@ -107,7 +107,7 @@ class RESTfulClient:
                 errmsg += '\n'.join(["    at %s\n        %s"
                                         % (ln['at'], ln['code'])
                                             for ln in data['traceback']])
-                self.logger.error(errmsg, exc_info=ex)
+                self.logger.error(errmsg)
 
                 if ex.status == 401 :
                     raise UnauthorizedError(data['message']) from ex
