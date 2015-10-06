@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import tornado.web
+import os
+import mimetypes
 
 
 class StaticFileHandler(tornado.web.StaticFileHandler):
@@ -17,6 +20,14 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
         self.debug        = debug
         self.index_file   = index_file
         self.default_path = default_path
+
+    @property
+    def logger(self):
+        if hasattr(self, '_logger'):
+            return self._logger
+
+        self._logger = logging.getLogger('static_handler')
+        return self._logger
 
     def set_extra_headers(self, path):
         if self.debug:
@@ -58,7 +69,7 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
         if self.request.path == self.default_path: # default_path does exists
             errmsg = 'NOT FOUND: default_path[%s]: %s '
             errmsg %= (self.default_path, absolute_path)
-            access_log.warn(errmsg)
+            self.logger.warn(errmsg)
             raise tornado.web.HTTPError(404)
 
         if self.default_path is not None:
@@ -71,6 +82,7 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
                 # redirect if the mime type of path are same with default_path
                 self.redirect(self.default_path)
         else:
+            self.logger.debug('not found: %s' % absolute_path)
             raise tornado.web.HTTPError(404)
 
     @classmethod

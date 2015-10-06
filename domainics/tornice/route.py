@@ -7,6 +7,7 @@ import inspect
 import types
 import datetime
 import functools
+import sys
 from importlib import import_module
 from collections import namedtuple, OrderedDict
 from tornado.web import RequestHandler, HTTPError
@@ -60,6 +61,8 @@ class HTTPRouteSpec():
         self.path_signature = OrderedDict()
         self.path_pattern = None
         self.handler_class = None
+        self.code_filename = None
+        self.code_lineno = None
 
     def add_method(self, method):
         self.methods.append(method)
@@ -68,6 +71,11 @@ class HTTPRouteSpec():
         self.path = path
 
         def decorator(service_func):
+            frame = sys._getframe(1)
+            if frame:
+                self.code_filename = frame.f_code.co_filename
+                self.code_lineno = frame.f_lineno
+
             spec_table = RouteSpecTable.get_table(service_func)
             spec_table.set_rule(self, service_func)
 

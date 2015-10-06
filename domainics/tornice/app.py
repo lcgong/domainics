@@ -2,6 +2,7 @@
 import logging
 
 import re
+import sys
 import bisect
 import os.path
 import inspect
@@ -30,9 +31,14 @@ from collections import OrderedDict
 class OrderedURLSpec(tornado.web.URLSpec):
 
     def __init__(self, priority, pattern, handler,
-                                            path=None, kwargs=None, name=None):
+                    path=None, kwargs=None, name=None,
+                    code_filename=None, code_lineno=None):
+
         self.priority = priority
         self.path = path
+        self.code_filename = code_filename
+        self.code_lineno = code_lineno
+
         super(OrderedURLSpec, self).__init__(pattern, handler, kwargs, name)
 
     def __lt__(self, other):
@@ -40,6 +46,11 @@ class OrderedURLSpec(tornado.web.URLSpec):
             return True
 
         if self.priority == other.priority:
+            if self.code_filename is not None and self.code_lineno is not None:
+                if ((self.code_filename, self.code_lineno) <
+                            (other.code_filename, other.code_lineno)):
+                    return True
+
             if self.regex.pattern < other.regex.pattern:
                 return True
 
@@ -66,12 +77,20 @@ class Application(tornado.web.Application):
         :param default: the default path if the url path is not accessible.
         """
 
+        frame = sys._getframe(1)
+        code_lineno = frame.f_lineno
+        code_filename = frame.f_code.co_filename
+
+        self._start_frame = sys._getframe(1)
+
         kwargs = dict(folder        = folder,
                       index_file    = index,
                       default_path  = default)
 
-        self._add_handler(pattern, StaticFileHandler,
-                            kwargs=kwargs, priority=100)
+        self._add_handler(pattern, StaticFileHandler, kwargs=kwargs,
+                            priority=100,
+                            code_filename = code_filename,
+                            code_lineno = code_lineno )
 
     def add_module(self, pkg_or_module, priority=50):
         for module in iter_submodules(pkg_or_module):
@@ -85,7 +104,10 @@ class Application(tornado.web.Application):
 
             for spec in route_table.route_specs:
                 self._add_handler(spec.path_pattern, spec.handler_class,
-                                            priority=priority, path=spec.path)
+                                    priority=priority,
+                                    path=spec.path,
+                                    code_filename = spec.code_filename,
+                                    code_lineno = spec.code_lineno )
 
 
     def log_route_handlers(self):
@@ -119,8 +141,8 @@ class Application(tornado.web.Application):
         self.logger.info('\n'.join(segs))
 
 
-    def _add_handler(self, pattern, handler_class,
-                                        path=None, kwargs=None, priority=100):
+    def _add_handler(self, pattern, handler_class, path=None, kwargs=None,
+                        priority=100, code_filename = None, code_lineno = None):
 
         if not self.handlers:
             host_pattern = re.compile(r'.*$')
@@ -133,9 +155,11 @@ class Application(tornado.web.Application):
         assert pattern is not None and handler_class is not None
 
         urlspec = OrderedURLSpec(priority, pattern, handler_class,
-                                                    path=path, kwargs=kwargs)
-        bisect.insort_left(handlers, urlspec)
+                                        path=path, kwargs=kwargs,
+                                        code_filename=code_filename,
+                                        code_lineno=code_lineno)
 
+        bisect.insort_left(handlers, urlspec)
 
     def setup(self):
         self.log_route_handlers()
