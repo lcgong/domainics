@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-
+import inspect
 from datetime import datetime, date
 from decimal import Decimal
 from domainics.db import dtable
@@ -9,9 +9,14 @@ from domainics.domobj import dset, datt
 
 from domainics.db import DBSchema, set_dsn, transaction, dbc, dmerge, drecall
 
-def setup_module(module):
+set_dsn(sys='postgres', database="ci_test", host='localhost', user='dbo')
+
+
+
+def setup_function(function):
     print()
-    set_dsn(sys='postgres', database="ci_test", host='localhost', user='dbo')
+    module = inspect.getmodule(function)
+
     schema = DBSchema()
     schema.add_module(module)
     schema.drop()
@@ -64,3 +69,16 @@ def test_recall2():
     print("O: ", ds0)
     print("N: ", ds1)
     dmerge(ds1, ds0)
+
+@transaction
+def test_recall_without_dset_key():
+    ASet = dset(t_b) # define a key of dset
+
+    ds1 = ASet()
+    ds1 += [t_b(a=1, b=12, c=13, d= 14), t_b(a=1, b=22, c=23, d=24)]
+    ds1 += [t_b(a=1, b=32, c=33, d= 34), t_b(a=1, b=42, c=43, d=44)]
+    dmerge(ds1)
+
+    ds2 = drecall(ASet())
+    assert len(ds2) == 4
+    print(ds2)

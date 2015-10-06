@@ -53,25 +53,26 @@ def _recall_dset(obj):
     if hasattr(item_cls, '__table_name__'):
         table_name = item_cls.__table_name__
     else:
-        table_name = obj.__class__.__name__
+        table_name = item_cls.__name__
 
     pk_names = []
 
     col_names = tuple(iter_chain(item_cls.__dobject_key__,
                                         item_cls.__dobject_att__))
 
-
-    sql = "SELECT " + ', '.join(col_names) + " FROM " + table_name
-
-    if obj.__dobject_key__:
-        sql += '\nWHERE '
-        sql += ' AND '.join(n + "=%s" for n in obj.__class__.__dobject_key__)
-
     pk_values = []
     for val in obj.__dobject_key__:
         pk_values.append(val)
 
-    dbc << sql << tuple(pk_values)
+    sql = "SELECT " + ', '.join(col_names) + " FROM " + table_name
+
+    if pk_values:
+        sql += '\nWHERE '
+        sql += ' AND '.join(n + "=%s" for n in obj.__class__.__dobject_key__)
+
+        dbc << sql << tuple(pk_values)
+    else:
+        dbc << sql
 
     # empty dset with key
     new_ds = obj.__class__(dbc, **obj.__dobject_key__.as_dict())
