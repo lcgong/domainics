@@ -16,7 +16,7 @@ class PyTest(TestCommand):
         _test_args = [
             '--verbose',
             '--ignore=build',
-            '--cov={0}'.format(self.test_package_name),
+            '--cov=domainics',
             '--cov-report=term-missing',
             # '--pep8',
         ]
@@ -35,14 +35,14 @@ class PyTest(TestCommand):
 
 setup(
     name='domainics',
-    version='0.3.2',
+    version='0.3.3',
     license="BSD",
     description='Web Framwork with Domain-orieted architecure',
     author='Chenggong Lyu',
     author_email='lcgong@gmail.com',
     url='https://github.com/lcgong/domainics',
-    packages=find_packages("src"),
-    package_dir = {"": "src"},
+    packages=find_packages("."),
+    # package_dir = {"": "."},
     zip_safe = False,
     install_requires = ["tornado>=4.2",
                         "psycopg2>=2.6.1",
@@ -60,7 +60,7 @@ setup(
         "Programming Language :: Python :: Implementation :: CPython",
         "Topic :: Utilities",
         ],
-    test_suite='tests',
+    test_suite='domainics.test',
     tests_require=[
         'pytest',
         'pytest-pep8',
