@@ -109,7 +109,7 @@ def dset(*args, **kwargs):
 
     # ----------------------------------------------------------------------
 
-    type_name = item_type.__name__
+    # type_name = item_type.__name__
 
     if type_name is None:
         type_name = item_type.__name__
