@@ -201,10 +201,19 @@ class BaseFuncRequestHandler(RequestHandler):
         # use type hinting
         ret_type = func_sig.return_annotation
         if result is not None and ret_type != inspect._empty:
-            if ret_type == result.__class__ :
+
+            if issubclass(ret_type, DSet[DObject]):
+                if isinstance(result, DSetBase):
+                    return result
+                else:
+                    item_type = ann_type.__parameters__[0]
+                    result = dset(item_type)(result)
+                    return result
+
+            elif issubclass(result.__class__, ret_type) :
                 return result
             else:
-                return ret_type(reshape(result))
+                return ret_type(result)
 
         return result
 
