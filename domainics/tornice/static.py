@@ -21,6 +21,9 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
         self.index_file   = index_file
         self.default_path = default_path
 
+        if self.default_path is not None and self.default_path[0] == '/':
+            self.default_path = self.default_path[1:]
+
     @property
     def logger(self):
         if hasattr(self, '_logger'):
@@ -48,42 +51,34 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
         """overload this method to handle default rule"""
 
         root_folder = os.path.abspath(root_folder)
+
         if not absolute_path.startswith(root_folder):
-            errmsg = "%s is not in root_folder static directory" % self.path
+            errmsg = "There is no %s in root_folder static directory"
+            errmsg %= self.path
             raise tornado.web.HTTPError(403, errmsg)
 
+        if os.path.isfile(absolute_path):
+            return absolute_path
+
         if (os.path.isdir(absolute_path) and self.index_file is not None):
-            if not self.request.path.endswith("/"):
-                # if the path is folder, the path should end with '/'.
-                self.redirect(self.request.path + "/", permanent=True)
-                return
-            absolute_path = os.path.join(absolute_path, self.index_file)
-
-        if os.path.exists(absolute_path):
-            if os.path.isfile(absolute_path):
-                return absolute_path
-            else:
-                msg = "it is not a file: '%s' '%s' " % (absolute_path, self.path)
-                raise tornado.web.HTTPError(403, msg)
-
-        if self.request.path == self.default_path: # default_path does exists
-            errmsg = 'NOT FOUND: default_path[%s]: %s '
-            errmsg %= (self.default_path, absolute_path)
-            self.logger.warn(errmsg)
-            raise tornado.web.HTTPError(404)
+            file_path = os.path.join(absolute_path, self.index_file)
+            if os.path.isfile(file_path):
+                return file_path
 
         if self.default_path is not None:
-            guess_mimetype = lambda path : mimetypes.guess_type(path)[0]
+            # guess_mimetype = lambda path : mimetypes.guess_type(path)[0]
 
-            abs_default_path = os.path.join(root_folder, self.default_path)
-            abs_default_path = os.path.abspath(abs_default_path)
+            file_path = os.path.join(root_folder, self.default_path)
+            file_path = os.path.abspath(file_path)
 
-            if guess_mimetype(abs_default_path) == guess_mimetype(absolute_path) :
-                # redirect if the mime type of path are same with default_path
-                self.redirect(self.default_path)
-        else:
-            self.logger.debug('not found: %s' % absolute_path)
-            raise tornado.web.HTTPError(404)
+            request_mimetype = mimetypes.guess_type(absolute_path)[0]
+            if request_mimetype is None:
+                return file_path
+            elif request_mimetype == mimetypes.guess_type(file_path)[0]:
+                return file_path
+
+        self.logger.debug('not found: %s' % absolute_path)
+        raise tornado.web.HTTPError(404)
 
     @classmethod
     def format_class(cls):
