@@ -6,6 +6,25 @@ import os
 import mimetypes
 
 
+class RaiseErrorHandler(tornado.web.RequestHandler):
+
+    def initialize(self, status_code=None, reason=None):
+        self.status_code = status_code
+        self.reason = reason
+
+    def get(self, *args):
+        raise tornado.web.HTTPError(self.status_code, self.reason)
+
+    def put(self, *args):
+        raise tornado.web.HTTPError(self.status_code, self.reason)
+
+    def post(self, *args):
+        raise tornado.web.HTTPError(self.status_code, self.reason)
+
+    def delete(self, *args):
+        raise tornado.web.HTTPError(self.status_code, self.reason)
+
+
 class StaticFileHandler(tornado.web.StaticFileHandler):
     '''read static files from folder.
 

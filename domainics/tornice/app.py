@@ -12,7 +12,7 @@ import mimetypes
 
 import tornado.web
 
-from .static import StaticFileHandler
+from .static import StaticFileHandler, RaiseErrorHandler
 from .cookie import generate_cookie_secret
 from ..pillar import _pillar_history, pillar_class
 from ..util import iter_submodules
@@ -91,6 +91,20 @@ class Application(tornado.web.Application):
                             priority=100,
                             code_filename = code_filename,
                             code_lineno = code_lineno )
+
+
+    def redirect(self, pattern, status_code=404, reason=None):
+        frame = sys._getframe(1)
+        code_lineno = frame.f_lineno
+        code_filename = frame.f_code.co_filename
+
+        kwargs = dict(status_code = status_code, reason = reason)
+
+        self._add_handler(pattern, RaiseErrorHandler, kwargs=kwargs,
+                            priority=100,
+                            code_filename = code_filename,
+                            code_lineno = code_lineno )
+
 
     def add_module(self, pkg_or_module, priority=50):
         for module in iter_submodules(pkg_or_module):
