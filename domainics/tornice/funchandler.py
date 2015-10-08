@@ -32,9 +32,8 @@ class BaseFuncRequestHandler(RequestHandler):
     def logger(self):
         if hasattr(self, '_logger'):
             return self._logger
-        self._logger = logging.getLogger(self.service_name + '.handler')
+        self._logger = logging.getLogger(self.__class__.__name__)
         return self._logger
-
 
     @property
     def principal_id(self):
@@ -67,7 +66,7 @@ class BaseFuncRequestHandler(RequestHandler):
         segs = []
         for arg in kwargs:
             segs.append('%s=%r' % (arg, kwargs.get(arg, None)))
-        return self.service_name + '(' + ', '.join(kwargs) + ') at ' + hex(id(self))
+        return self.__class__.__name__ + '(' + ', '.join(kwargs) + ') at ' + hex(id(self))
 
 
     def handle_exception(self, exc_info):
@@ -122,75 +121,78 @@ class BaseFuncRequestHandler(RequestHandler):
 
         return None
 
-    def parse_arguments(self, func_sig, args, kwargs):
-        arguments = OrderedDict()
+def parse_arguments(handler, func_sig, path_signature, args, kwargs):
+    arguments = OrderedDict()
 
-        for arg_name, arg_spec in func_sig.parameters.items():
+    print(333, path_signature)
 
-            arg_val = None
-            ann_type = arg_spec.annotation
+    for arg_name, arg_spec in func_sig.parameters.items():
 
-            if arg_name in self.path_signature:
-                # get argument value from path arguments
-                arg_val = kwargs[arg_name]
+        arg_val = None
+        ann_type = arg_spec.annotation
 
-            elif arg_name == 'json_arg':
-                arg_val = self._read_json_object()
+        if arg_name in path_signature:
+            # get argument value from path arguments
+            arg_val = kwargs[arg_name]
 
+        elif arg_name == 'json_arg':
+            arg_val = handler._read_json_object()
+
+        else:
+            arg_val = handler.get_argument(arg_name, None)
+
+        if ann_type != inspect._empty:
+            if issubclass(ann_type, DSet[DObject]):
+
+                item_type = ann_type.__parameters__[0]
+
+                if arg_name != 'json_arg' :
+                    arg_val = handler._read_json_object()
+
+                arg_val = dset(item_type)(arg_val)
+
+            elif issubclass(ann_type, DObject):
+                if arg_name != 'json_arg' :
+                    arg_val = handler._read_json_object()
+
+                arg_val = ann_type(arg_val)
             else:
-                arg_val = self.get_argument(arg_name, None)
+                if issubclass(ann_type, datetime):
+                    arg_val = arrow.get(arg_val).datetime
 
-            if ann_type != inspect._empty:
-                if issubclass(ann_type, DSet[DObject]):
+                elif issubclass(ann_type, date):
+                    arg_val = arrow.get(arg_val).datetime.date()
 
-                    item_type = ann_type.__parameters__[0]
-
-                    if arg_name != 'json_arg' :
-                        arg_val = self._read_json_object()
-
-                    arg_val = dset(item_type)(arg_val)
-
-                elif issubclass(ann_type, DObject):
-                    if arg_name != 'json_arg' :
-                        arg_val = self._read_json_object()
-
-                    arg_val = ann_type(arg_val)
                 else:
-                    if issubclass(ann_type, datetime):
-                        arg_val = arrow.get(arg_val).datetime
+                    arg_val = ann_type(arg_val)
 
-                    elif issubclass(ann_type, date):
-                        arg_val = arrow.get(arg_val).datetime.date()
+        else:
+            pass
 
-                    else:
-                        arg_val = ann_type(arg_val)
+        if arg_val is None and arg_spec.default is not inspect._empty :
+            arg_val = param.default
 
-            else:
-                pass
+        arguments[arg_name] = arg_val
 
-            if arg_val is None and arg_spec.default is not inspect._empty :
-                arg_val = param.default
-
-            arguments[arg_name] = arg_val
-
-        return arguments
+    return arguments
 
 
-    def do_handler_func(self, *args, **kwargs) :
+def service_func_handler(proto, service_func, service_name, path_sig) :
 
-        func_sig = inspect.signature(self.service_func)
+    def http_handler(self, *args, **kwargs):
 
-        arguments = self.parse_arguments(func_sig, args, kwargs)
+        func_sig = inspect.signature(service_func)
+
+        arguments = parse_arguments(self, func_sig, path_sig, args, kwargs)
 
         self._handler_args = arguments
 
         def exit_callback(exc_type, exc_val, tb):
             self._handler_args = None
 
-        busilogic_layer = BusinessLogicLayer(self.service_name,
-                                                self.principal_id)
+        busilogic_layer = BusinessLogicLayer(service_name, self.principal_id)
 
-        bound_func = _pillar_history.bound(self.service_func,
+        bound_func = _pillar_history.bound(service_func,
                                            [(_request_handler_pillar, self),
                                             (_busilogic_pillar,
                                              busilogic_layer)],
@@ -217,18 +219,27 @@ class BaseFuncRequestHandler(RequestHandler):
 
         return result
 
-
-class RESTFuncRequestHandler(BaseFuncRequestHandler):
-
-
-    def do_handler_func(self, *args, **kwargs):
-        obj = super(RESTFuncRequestHandler, self).do_handler_func(*args, **kwargs)
+    def rest_handler(self, *args, **kwargs):
+        obj = http_handler(self, *args, **kwargs)
 
         if not isinstance(obj, (list, tuple, DSetBase)):
             obj = [obj] if obj is not None else []
 
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps(obj))
+
+    if proto == 'REST':
+        return rest_handler
+    elif proto == 'HTTP':
+        return http_handler
+    else:
+        raise ValueError('Unknown')
+
+
+class RESTFuncRequestHandler(BaseFuncRequestHandler):
+
+
+
 
 
     def write_error(self, status_code, **kwargs):

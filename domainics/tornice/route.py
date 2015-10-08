@@ -24,6 +24,7 @@ from urllib.parse import urljoin
 from ..busitier import _busilogic_pillar, BusinessLogicLayer
 
 from .funchandler import BaseFuncRequestHandler, RESTFuncRequestHandler
+from .funchandler import service_func_handler
 
 from .route_path import parse_route_path
 
@@ -55,6 +56,7 @@ class HTTPRouteSpec():
     def __init__(self, proto):
         self.module_name = None   # name of service module
         self.service_name = None  # name of service function
+        self.service_func = None
         self.proto = proto        # http protocol
         self.methods = []         # http methods
         self.path = ''            # the path of service endpoint
@@ -149,44 +151,76 @@ class RouteSpecTable:
 
     def setup(self):
         # This process must be after all service function are decorated
+
+        funcs = OrderedDict()
+
         for spec in self._specs:
-            spec.handler_class = self._make_handler_class(spec)
+            proto = spec.proto
+            pattern = spec.path_pattern
 
-    def _make_handler_class(self, route_spec):
+            if proto not in funcs:
+                funcs[proto] = OrderedDict()
 
-        try:
-            # make sure that decorated-order is irrevalent!!!
-            # There are decorators will decorator this function laterly.
-            # To make these decorators available, refresh these service function
-            service_func = getattr(self.service_module, route_spec.service_name)
-        except AttributeError as ex:
-            errmsg = "Could not find '%s' service function in module '%s'. "
-            errmsg %= (service_func.__name__, self.service_module.__name__)
-            errmsg += "The function or its name shoule be declared in module."
-            raise AttributeError(errmsg)
+            if pattern not in funcs[proto]:
+                funcs[proto][pattern] = []
 
-        class_dict = dict(
-            # service_func is function that has no 'self' parameter
-            __module__      = route_spec.module_name,
-            service_name    = route_spec.service_name,
-            service_func    = staticmethod(service_func),
-            path_signature  = route_spec.path_signature
-            )
+            try:
+                # make sure that decorated-order is irrevalent!!!
+                # There are decorators will decorator this function laterly.
+                # To make these decorators available,
+                # refresh these service function
+                service_func = getattr(self.service_module, spec.service_name)
+            except AttributeError as ex:
+                errmsg = "Could not find '%s' service function in module '%s'."
+                errmsg %= (service_func.__name__, self.service_module.__name__)
+                errmsg += "The function or its name shoule be declared in module."
+                raise AttributeError(errmsg)
 
-        if route_spec.proto == 'REST':
-            base_classes = (RESTFuncRequestHandler,)
-        elif route_spec.proto == 'HTTP':
-            base_classes = (BaseFuncRequestHandler,)
+            spec.service_func = service_func
 
-        class_name = route_spec.service_name + '_'
-        class_name += route_spec.proto.lower() + '_handler'
+            funcs[proto][pattern].append(spec)
 
-        cls = type(class_name, base_classes, class_dict)
-        for m in route_spec.methods:
-            setattr(cls, m.lower(), cls.do_handler_func)
+        module_name = self.service_module.__name__
 
-        return cls
+        for proto in funcs:
+            for pattern, specs in funcs[proto].items():
+                cls = make_handler_class(proto, module_name, specs)
 
+                for spec in specs:
+                    spec.handler_class = cls
+
+
+
+
+def make_handler_class(proto, module_name, specs):
+
+    class_dict = dict(__module__ = module_name)
+
+    if proto == 'REST':
+        base_classes = (RESTFuncRequestHandler,)
+    elif proto == 'HTTP':
+        base_classes = (BaseFuncRequestHandler,)
+
+
+    code_linenos = []
+    for spec in specs:
+        code_linenos.append(str(spec.code_lineno))
+
+    class_name = module_name + '_' + '_'.join(code_linenos) + '_'
+    class_name += proto.lower() + '_handler'
+
+    cls = type(class_name, base_classes, class_dict)
+
+    for spec in specs:
+        for m in spec.methods:
+            handler_func = service_func_handler(proto,
+                                                spec.service_func,
+                                                spec.service_name,
+                                                spec.path_signature)
+
+            setattr(cls, m.lower(), handler_func)
+
+    return cls
 
 
 class HTTPRouteSpecDecoratorFactory():
