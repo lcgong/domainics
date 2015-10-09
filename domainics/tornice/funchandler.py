@@ -249,6 +249,8 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
         if isinstance(obj, DSetBase) and hasattr(obj, '_page'):
             content_range = obj._page.format_content_range()
             self.set_header('Content-Range', content_range)
+            if obj._page.start != 0 or obj._page.limit is not None:
+                self.set_status(206)
 
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps(obj))
