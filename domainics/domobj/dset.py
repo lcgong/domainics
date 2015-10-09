@@ -13,6 +13,7 @@ import sys
 from .dobject import dobject
 from .typing import DObject, DSet, DSetBase, DAttribute, AnyDObject
 from .typing import parse_attr_value_many, consume_kwargs
+from .pagination import DPage
 from .metaclass import _make_pkey_class, DObjectMetaClass
 
 from itertools import chain as iter_chain
@@ -41,7 +42,6 @@ def dset(*args, **kwargs):
 
     dominion_class = consume_kwargs(kwargs, '_dominion', (DObject, DSetBase))
     type_name = consume_kwargs(kwargs, '_name', (str,))
-
 
     undefined_attrs = set()
     key_attrs = OrderedDict()
@@ -162,6 +162,14 @@ class DSetBaseImpl(DSetBase, dobject):
                                         + dominion_obj.__class__.__name__)
                 raise ValueError(errmsg)
 
+        pagination = None
+        arg_name = "_page"
+        if arg_name in kwargs:
+            pagination = kwargs.pop(arg_name)
+            if not isinstance(pagination, DPage):
+                err = "The pagination '_page' should be a DPage object"
+                raise ValueError(err)
+
         item_iterable = None
         origin_obj = None
         if args:
@@ -216,6 +224,11 @@ class DSetBaseImpl(DSetBase, dobject):
 
                     kwargs[attr_name] = getattr(orig_domi_obj, attr_name)
 
+                if hasattr(orig_domi_obj, '_page'):
+                    if isinstance(orig_domi_obj._page, DPage):
+                        pagination = orig_domi_obj._page
+
+
         for attr_name in kwargs:
             if attr_name not in cls.__dobject_key__:
                 err = "Given attribute %s is unkown or not the key attribute"
@@ -223,11 +236,17 @@ class DSetBaseImpl(DSetBase, dobject):
                 err %= (attr_name)
                 raise ValueError(err)
 
+
         instance = super(DSetBase, cls).__new__(cls, **kwargs)
 
         instance_setter = super(dobject, instance).__setattr__
         instance_setter('__dset_item_dict__',  OrderedDict())
         instance_setter('__dominion_object__',  dominion_obj)
+
+        if pagination is None:
+            pagination = DPage()
+
+        instance_setter('_page',  pagination)
 
         if item_iterable is not None:
             for item in item_iterable:
@@ -369,6 +388,9 @@ class DSetBaseImpl(DSetBase, dobject):
 
         if self.__dobject_key__:
             opts.append("_key={0!r}".format(self.__dobject_key__))
+
+        if self._page:
+            opts.append("_page={0!r}".format(self._page))
 
         opts = ', '.join(opts)
 

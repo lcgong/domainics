@@ -64,17 +64,33 @@ def _recall_dset(obj):
     for val in obj.__dobject_key__:
         pk_values.append(val)
 
-    sql = "SELECT " + ', '.join(col_names) + " FROM " + table_name
+    sql = "\nSELECT " + ', '.join(col_names) + " FROM " + table_name
 
     if pk_values:
         sql += '\nWHERE '
         sql += ' AND '.join(n + "=%s" for n in obj.__class__.__dobject_key__)
 
-        dbc << sql << tuple(pk_values)
-    else:
-        dbc << sql
+    if obj._page:
+        if obj._page.sortable:
+            sortables = []
+            for s in obj._page.sortable:
+                asc = 'ASC' if s.ascending else 'DESC'
+                sortables.append(s.name + ' ' + asc)
+
+            sql += '\nORDER BY ' + ', '.join(sortables)
+
+        if obj._page.limit is not None:
+            sql += '\nLIMIT %d' % obj._page.limit
+
+        if obj._page.start is not None:
+            sql += '\nOFFSET %d' % obj._page.start
+
+    dbc << sql
+    if pk_values:
+        dbc << tuple(pk_values)
 
     # empty dset with key
-    new_ds = obj.__class__(dbc, **obj.__dobject_key__.as_dict())
+    new_ds = obj.__class__(dbc, **obj.__dobject_key__.as_dict(),
+                           _page=obj._page.copy())
 
     return new_ds

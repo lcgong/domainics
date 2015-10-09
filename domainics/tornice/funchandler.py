@@ -14,6 +14,8 @@ from ..pillar import _pillar_history, pillar_class
 from ..util   import comma_split, filter_traceback
 from ..domobj import dset, dobject, DSetBase, DObject, DSet
 
+from ..domobj.pagination import DPage, parse_query_range, parse_header_range
+
 from .. import json as _json
 
 from typing import Any
@@ -124,8 +126,6 @@ class BaseFuncRequestHandler(RequestHandler):
 def parse_arguments(handler, func_sig, path_signature, args, kwargs):
     arguments = OrderedDict()
 
-    print(333, path_signature)
-
     for arg_name, arg_spec in func_sig.parameters.items():
 
         arg_val = None
@@ -156,6 +156,9 @@ def parse_arguments(handler, func_sig, path_signature, args, kwargs):
                     arg_val = handler._read_json_object()
 
                 arg_val = ann_type(arg_val)
+            elif issubclass(ann_type, DPage):
+                arg_val = make_pagination(handler)
+
             else:
                 if issubclass(ann_type, datetime):
                     arg_val = arrow.get(arg_val).datetime
@@ -176,6 +179,24 @@ def parse_arguments(handler, func_sig, path_signature, args, kwargs):
 
     return arguments
 
+
+def make_pagination(handler):
+
+    start = None
+    limit = None
+    sortable = None
+
+    content_range = handler.get_argument('range', None)
+    if content_range:
+        start, limit, sortable = parse_query_range(content_range)
+
+    content_range = handler.request.headers.get("Range", None)
+    if content_range :
+        start, limit, total, sortable = parse_header_range(content_range)
+
+    page = DPage(start=start, limit=limit, sortable=sortable)
+
+    return page
 
 def service_func_handler(proto, service_func, service_name, path_sig) :
 
@@ -225,6 +246,10 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
         if not isinstance(obj, (list, tuple, DSetBase)):
             obj = [obj] if obj is not None else []
 
+        if isinstance(obj, DSetBase) and hasattr(obj, '_page'):
+            content_range = obj._page.format_content_range()
+            self.set_header('Content-Range', content_range)
+
         self.set_header('Content-Type', 'application/json; charset=UTF-8')
         self.write(_json.dumps(obj))
 
@@ -236,10 +261,8 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
         raise ValueError('Unknown')
 
 
+
 class RESTFuncRequestHandler(BaseFuncRequestHandler):
-
-
-
 
 
     def write_error(self, status_code, **kwargs):

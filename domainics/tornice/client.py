@@ -43,7 +43,7 @@ class RESTfulClient:
         self._base_url = urljoin(self._base_url, url)
 
     def request(self, method, url=None, url_args=None, qs_args=None,
-                post_args=None, json_args=None) :
+                post_args=None, json_args=None, page=None) :
 
         if url_args is not None:
             # apply the arguments in URL
@@ -73,6 +73,9 @@ class RESTfulClient:
         if json_args is not None:
             headers['Content-type'] = 'application/json'
             body = _json.dumps(json_args).encode('UTF-8')
+
+        if page is not None:
+            headers['Range'] = page.format_content_range()
 
         if post_args is not None:
             headers['Content-type'] = 'application/x-www-form-urlencoded'
@@ -130,9 +133,10 @@ class RESTfulClient:
             raise ex
 
     def get(self, url=None, url_args=None, qs_args=None,
-                    post_args=None, json_args=None):
+                    post_args=None, json_args=None, page=None):
 
-        return self.request('GET', url, url_args, qs_args, post_args, json_args)
+        return self.request('GET', url, url_args, qs_args,
+                            post_args, json_args, page)
 
     def post(self, url=None, url_args=None, qs_args=None,
                     post_args=None, json_args=None):

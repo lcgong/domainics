@@ -122,7 +122,7 @@ DSet
     BSet = dset(B, _key=no, sn=A.sn) # make a new type dset
     s2 = BSet(s1, attr=val) # create a dset object
 
-    # 
+    #
 
 
 
@@ -169,3 +169,4 @@ from .typing import DSet, DObject
 from .dattr import datt
 from .dobject import dobject
 from .dset import dset, DSetBase
+from .pagination import DPage
