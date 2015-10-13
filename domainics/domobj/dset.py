@@ -183,7 +183,7 @@ class DSetBaseImpl(DSetBase, dobject):
             else:
                 err = ("The 1st positional argument must be dset or "
                        "iterable of %s")
-                err %= self.__dset_item_type__.__name__
+                err %= cls.__dset_item_type__.__name__
                 raise TypeError(err)
 
         if dominion_obj is not None:

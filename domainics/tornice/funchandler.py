@@ -231,8 +231,8 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
                 if isinstance(result, DSetBase):
                     return result
                 else:
-                    item_type = ann_type.__parameters__[0]
-                    result = dset(item_type)(result)
+                    item_type = ret_type.__parameters__[0]
+                    result = dset(item_type)([result])
                     return result
 
             elif issubclass(result.__class__, ret_type) :
@@ -273,12 +273,17 @@ class RESTFuncRequestHandler(BaseFuncRequestHandler):
         exc_info = kwargs['exc_info']
         status_code, reason, message, tb_list = self.handle_exception(exc_info)
 
+        if hasattr(self, 'service_name'):
+            service_name = self.service_name
+        else:
+            service_name = 'unknown_handler'
+
         errobj = OrderedDict(
                     status_code=status_code,
                     message=message,
                     exception=exc_info[0].__name__,
                     path=self.request.path,
-                    handler=self.service_name,
+                    handler=service_name,
                     traceback=tb_list)
 
         self.set_status(status_code, reason=reason)
