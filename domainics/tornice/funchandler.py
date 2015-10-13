@@ -202,6 +202,8 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
 
     def http_handler(self, *args, **kwargs):
 
+        setattr(self, 'service_name', service_name)
+
         func_sig = inspect.signature(service_func)
 
         arguments = parse_arguments(self, func_sig, path_sig, args, kwargs)

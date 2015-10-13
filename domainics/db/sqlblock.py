@@ -185,7 +185,7 @@ class BaseSQLBlock:
         This read-only attribute specifies the number of rows that the last
         query or the number of affected rows by DML statements.
         """
-        self._cursor.rowcount
+        return self._cursor.rowcount
 
     @property
     def record_type(self):
