@@ -93,8 +93,7 @@ class StaticFileHandler(tornado.web.StaticFileHandler):
             request_mimetype = mimetypes.guess_type(absolute_path)[0]
             if request_mimetype is None:
                 return file_path
-            elif request_mimetype == mimetypes.guess_type(file_path)[0]:
-                return file_path
+
 
         self.logger.debug('not found: %s' % absolute_path)
         raise tornado.web.HTTPError(404)
