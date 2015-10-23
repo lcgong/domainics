@@ -4,15 +4,20 @@ from itertools import chain as iter_chain
 
 from .sqlblock import dbc
 from ..domobj import DSetBase, DObject
+from ..db import dsequence
 
-
-def drecall(obj):
+def drecall(obj, present=False):
     """
     Recall the original version of the object from database.
+
+    If present is true, recall the original version of item by item in dset.
     """
 
     if isinstance(obj, DSetBase):
-        return _recall_dset(obj)
+        if not present:
+            return _recall_dset(obj)
+        else:
+            return _recall_dset_by_item(obj)
 
     elif isinstance(obj, DObject):
         return _recall_dobject(obj)
@@ -37,14 +42,27 @@ def _recall_dobject(obj):
 
     pk_values = []
     for val in obj.__dobject_key__:
+        if isinstance(val, dsequence):
+            val = val.value
         pk_values.append(val)
 
+
+    # print(3123, pk_values)
     dbc << sql << tuple(pk_values)
     origin = next(dbc)
     if origin is not None:
         return obj.__class__(origin)
     else:
         return obj.__class__()
+
+def _recall_dset_by_item(item_set):
+    origin_set = item_set.__class__()
+    for item in item_set:
+        origin_item = drecall(item)
+        if origin_item:
+            origin_set._add(origin_item)
+
+    return origin_set
 
 def _recall_dset(obj):
 
@@ -70,20 +88,7 @@ def _recall_dset(obj):
         sql += '\nWHERE '
         sql += ' AND '.join(n + "=%s" for n in obj.__class__.__dobject_key__)
 
-    if obj._page:
-        if obj._page.sortable:
-            sortables = []
-            for s in obj._page.sortable:
-                asc = 'ASC' if s.ascending else 'DESC'
-                sortables.append(s.name + ' ' + asc)
-
-            sql += '\nORDER BY ' + ', '.join(sortables)
-
-        if obj._page.limit is not None:
-            sql += '\nLIMIT %d' % obj._page.limit
-
-        if obj._page.start is not None:
-            sql += '\nOFFSET %d' % obj._page.start
+    sql += _make_page_sql(obj._page)
 
     dbc << sql
     if pk_values:
@@ -94,3 +99,25 @@ def _recall_dset(obj):
                            _page=obj._page.copy())
 
     return new_ds
+
+def _make_page_sql(page) :
+    if not page:
+        return ''
+
+
+    sql = ''
+    if page.sortable:
+        sortables = []
+        for s in page.sortable:
+            asc = 'ASC' if s.ascending else 'DESC'
+            sortables.append(s.name + ' ' + asc)
+
+        sql += '\nORDER BY ' + ', '.join(sortables)
+
+    if page.limit is not None:
+        sql += '\nLIMIT %d' % page.limit
+
+    if page.start is not None:
+        sql += '\nOFFSET %d' % page.start
+
+    return sql
