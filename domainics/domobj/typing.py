@@ -5,7 +5,7 @@ from datetime import datetime, date
 import arrow
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
-
+from numbers import Number
 
 class DObject:
     pass
@@ -38,12 +38,20 @@ def cast_attr_value(attrname, val, attr_type):
     try:
         if isinstance(val, str) and issubclass(attr_type, (datetime, date)):
             val = arrow.get(val).datetime
-            if issubclass(attr_type, date):
-                return val.date()
-            else:
+            if issubclass(attr_type, datetime):
                 return val
+            else:
+                return val.date()
+
+        elif isinstance(val, str) and issubclass(attr_type, (Number,)):
+            val = val.strip()
+            if len(val) == 0:
+                return None
+            else:
+                return attr_type(val)
         else:
-            return attr_type(val)
+                return attr_type(val)
+
     except (ValueError, TypeError) as ex:
         err = "The attribute '%s' should be \'%s\' type, not '%s'"
         err %= (attrname, attr_type.__name__, type(val).__name__)

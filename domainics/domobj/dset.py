@@ -340,6 +340,9 @@ class DSetBaseImpl(DSetBase, dobject):
 
         # ------------------------------------------------------------
 
+        print(3334, subst_values)
+        print(3335, obj)
+
         obj = item_cls(obj, **subst_values) # clone it and replace its values
 
         self.__dset_item_dict__[obj.__dobject_key__] = obj

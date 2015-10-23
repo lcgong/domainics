@@ -46,6 +46,7 @@ class datt(DAttribute):
         return attr_value
 
     def __set__(self, instance, value):
+        print(instance.__class__, instance.__class__.__dobject_key__)
         if self.name in instance.__class__.__dobject_key__:
             errmsg = "The primary key attribute '%s' is read-only"
             errmsg %= self.name
@@ -96,7 +97,18 @@ class datt(DAttribute):
     def set_value_unguardedly(self, instance, value):
 
         attr_values  = instance.__value_dict__
-        if hasattr(self.type, '__setter_filter__'):
+        if issubclass(self.type, DSetBase) and isinstance(value, Iterable):
+            if self.name not in attr_values:
+                attr_value = self.initialize(instance)
+                attr_value += value
+                attr_values[self.name] = attr_value
+            else:
+                attr_value = attr_values[self.name]
+                attr_value._clear()
+                attr_value += value
+
+            return
+        elif hasattr(self.type, '__setter_filter__'):
             value = self.type.__setter_filter__(value)
         else:
             value = cast_attr_value(self.name, value, self.type)
@@ -107,5 +119,6 @@ class datt(DAttribute):
 
         obj = datt(type=self.type, default=self.default, doc=self.doc,
                                 **self._kwargs)
+        obj.name = self.name
         obj.owner_class  = self.owner_class
         return obj
