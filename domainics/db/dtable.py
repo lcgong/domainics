@@ -52,11 +52,12 @@ class json_object(object):
         raise ValueError("the assigned value type should be one of"
                          " 'list', 'dict'")
 
+_NOT_ALLOCATED = object()
+
 class dsequence:
     """"""
-
-    def __init__(self, value=None):
-        if value is None or isinstance(value, int):
+    def __init__(self, value = _NOT_ALLOCATED):
+        if value is None or value is _NOT_ALLOCATED or isinstance(value, int):
             self.__value = value
         elif isinstance(value, str):
             self.__value = int(value)
@@ -71,10 +72,11 @@ class dsequence:
 
     @property
     def value(self):
-        if self.__value is None:
-            err = 'The sequence number %s is not allocated'
-            err %= self.__class__.__name__
-            raise ValueError(err)
+        if self.__value is _NOT_ALLOCATED:
+            return None
+            # err = 'The sequence number %s is not allocated'
+            # err %= self.__class__.__name__
+            # raise ValueError(err)
 
         return self.__value
 
@@ -82,24 +84,32 @@ class dsequence:
     def value(self, newval):
         if isinstance(newval, int):
             self.__value = newval
-        else:
-            err = 'The sequence value should be int, not %s'
-            err %= newval.__class__.__name__
-            raise TypeError(err)
+        # else:
+        #     return None
+            # err = 'The sequence value should be int, not %s'
+            # err %= newval.__class__.__name__
+            # raise TypeError(err)
+
+    @property
+    def allocated(self):
+        return self.__value is not _NOT_ALLOCATED
 
     def __bool__(self):
-        return self.__value is not None
+        return self.__value is not _NOT_ALLOCATED
 
     def __int__(self):
         return self.value
 
     def __json_object__(self):
-        if self.__value is not None:
+        if self.__value is not None and self.__value is not _NOT_ALLOCATED:
             return int(self)
 
         return None
 
     def __eq__(self, other):
+        if isinstance(other, int):
+            return self.__value is not None and self.__value == other
+
         if self.__value is not None and other.__value is not None:
             return self.__value == other.__value
 

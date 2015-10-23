@@ -127,24 +127,19 @@ def pq_dtable_merge(current, past):
                         seq_col[2].append(seq_val)
 
             for colidx, colname, seqvals in seq_cols:
-                if not seqvals:
-                    continue
+                allocate_sequence(seq_attrs[colname], seqvals)
 
-                # nextval of sequence
-                seqname = seq_attrs[colname].type.__name__
-                newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
-
-                for seq, value in zip(seqvals, newvals):
-                    seq.value = value
-
-        dbc << """
+        sql = """
         INSERT INTO {table} ({cols})
         VALUES ({vals});
         """.format(table=table_name,
                    cols=', '.join(cols),
                    vals=', '.join(['%s'] * len(cols)))
 
+        print(sql)
+        dbc << sql
         dbc << values
+
 
     if dchg.values:
 
@@ -163,15 +158,7 @@ def pq_dtable_merge(current, past):
                         seqvals.append(record[colname][0])
 
             for colname, seqvals in seq_cols.items():
-                if not seqvals:
-                    continue
-
-                # nextval of sequence
-                seqname = seq_attrs[colname].datatype.__name__
-                newvals = dbc.nextval(seqname, batch_cnt=len(seqvals))
-
-                for seq, value in zip(seqvals, newvals):
-                    seq.value = value
+                allocate_sequence(seq_attrs[colname], seqvals)
 
         # generate update statment in a modified field group
         groups = {}
@@ -210,7 +197,21 @@ def pq_dtable_merge(current, past):
 
         dbc << [k for k in ddel.pkey_values]
 
+
+def allocate_sequence(attr, seq_values):
+    pending = [i for i, s in enumerate(seq_values) if not s.allocated]
+    if not pending:
+        return
+
+    # nextval of sequence
+    seqname = attr.type.__name__
+    newvals = dbc.nextval(seqname, batch_cnt=len(pending))
+
+    for idx, value in zip(pending, newvals):
+        seq_values[idx].value = value
+
 def dmerge(current, origin=None):
+
     """
     Merge the current change of object into the origin.
 
@@ -235,7 +236,9 @@ def dmerge(current, origin=None):
             raise TypeError(err)
 
         dos = dset(origin.__class__)()
-        dos._add(origin)
+        if origin:
+            dos._add(origin)
+
         origin = dos
 
     if current is None:
