@@ -46,11 +46,13 @@ class DObjectMetaClass(type):
         for base_cls in reversed(bases): # overwriting priority, keep the first.
             attrs = getattr(base_cls, '__dobject_key__', None)
             if attrs is not None:
-                pkey_attrs.update(attrs)
+                for attr_name, attr in attrs.items():
+                    pkey_attrs[attr_name] = attr.copy()
 
             attrs = getattr(base_cls, '__dobject_att__', None)
             if attrs is not None:
-                value_attrs.update(attrs)
+                for attr_name, attr in attrs.items():
+                    pkey_attrs[attr_name] = attr.copy()
 
         attributes = OrderedDict()
         for attr_name, descriptor in class_dict.items():
@@ -74,17 +76,15 @@ class DObjectMetaClass(type):
         primary_key = parse_attr_value_many(primary_key, '__dobject_key__')
         pkey_names = set(primary_key.keys())
 
-
         #----------------------------------------------------------------------
-
         if pkey_names:
             # If available, the primary key declaration overrides parent's
-            for attr_name in tuple(reversed(pkey_attrs.keys())):
+            for attr_name, attr in tuple(reversed(pkey_attrs.items())):
                 if attr_name not in pkey_names:
                     # the pk attribute of child is not primary key
-                    attr = pkey_names.pop(attr_name)
+                    del pkey_attrs[attr_name]
                     value_attrs[attr_name] = attr
-                    value_attrs.move_to_end(attr_name, last=Fasle)
+                    value_attrs.move_to_end(attr_name, last=False)
 
 
         for attr_name, attr in attributes.items():
