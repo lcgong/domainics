@@ -109,13 +109,15 @@ class dsequence:
     def __eq__(self, other):
 
         if isinstance(other, int):
-            other_value = int
+            other_value = other
         elif isinstance(other, dsequence):
             other_value = other.__value
         else:
             errmsg = 'required type: dsequence or int, not: '
             errmsg += other.__class__.__name__
             raise TypeErro(errmsg)
+
+        print(self.__value, other_value, self.__value == other_value)
 
         if isinstance(self.__value, int) and isinstance(other_value, int):
             return self.__value == other_value;
