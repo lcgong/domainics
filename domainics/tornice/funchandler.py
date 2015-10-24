@@ -123,8 +123,10 @@ class BaseFuncRequestHandler(RequestHandler):
 
         return None
 
-def parse_arguments(handler, func_sig, path_signature, args, kwargs):
+def parse_arguments(handler, service_func, path_signature, args, kwargs):
     arguments = OrderedDict()
+
+    func_sig = inspect.signature(service_func)
 
     for arg_name, arg_spec in func_sig.parameters.items():
 
@@ -167,7 +169,17 @@ def parse_arguments(handler, func_sig, path_signature, args, kwargs):
                     arg_val = arrow.get(arg_val).datetime.date()
 
                 else:
-                    arg_val = ann_type(arg_val)
+                    # if arg_val is None:
+                    #     return None
+                    # else:
+                    try:
+                        arg_val = ann_type(arg_val)
+                    except TypeError as exc :
+                        errmsg = ("while parsing arg '%s' of %s, "
+                                  "caught an exception: ")
+                        errmsg %= (arg_name, service_func.__name__)
+                        errmsg += str(exc)
+                        raise TypeError(errmsg)
 
         else:
             pass
@@ -206,7 +218,7 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
 
         func_sig = inspect.signature(service_func)
 
-        arguments = parse_arguments(self, func_sig, path_sig, args, kwargs)
+        arguments = parse_arguments(self, service_func, path_sig, args, kwargs)
 
         self._handler_args = arguments
 
