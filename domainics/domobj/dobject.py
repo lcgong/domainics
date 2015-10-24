@@ -73,10 +73,10 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                         continue
 
                     attr_val = getattr(source_obj, src_attr_name)
-                    if isinstance(attr_val, DSetBase):
-                        # NOTED: the dominion object is required to replace
-                        aggregates.append((attr_name, attr, attr_val))
-                        continue
+                    # if isinstance(attr_val, DSetBase):
+                    #     # NOTED: the dominion object is required to replace
+                    #     aggregates.append((attr_name, attr, attr_val))
+                    #     continue
 
 
                     attr.set_value_unguardedly(instance, attr_val)
@@ -101,11 +101,12 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                 errmsg %= (arg_name, cls.__name__)
                 raise ValueError(errmsg)
 
+            # print(111, arg_name, arg_value, arg_value.__class__.__name__)
             attr.set_value_unguardedly(instance, arg_value)
             seen.add(arg_name)
 
-        for attr_name, attr, attr_val in aggregates:
-            attr_val = attr.type(attr_val, _dominion = instance)
+        # for attr_name, attr, attr_val in aggregates:
+        #     attr_val = attr.type(attr_val, _dominion = instance)
 
         # # set default values for these left parameters
         # for attr_name, attr in parameters.items():

@@ -107,11 +107,18 @@ class dsequence:
         return None
 
     def __eq__(self, other):
-        if isinstance(other, int):
-            return self.__value is not None and self.__value == other
 
-        if self.__value is not None and other.__value is not None:
-            return self.__value == other.__value
+        if isinstance(other, int):
+            other_value = int
+        elif isinstance(other, dsequence):
+            other_value = other.__value
+        else:
+            errmsg = 'required type: dsequence or int, not: '
+            errmsg += other.__class__.__name__
+            raise TypeErro(errmsg)
+
+        if isinstance(self.__value, int) and isinstance(other_value, int):
+            return self.__value == other_value;
 
         return id(self) == id(other)
 

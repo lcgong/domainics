@@ -111,6 +111,7 @@ class datt(DAttribute):
         elif hasattr(self.type, '__setter_filter__'):
             value = self.type.__setter_filter__(value)
         else:
+            # print(2222, self.name, value, value.__class__.__name__, self.type)
             value = cast_attr_value(self.name, value, self.type)
 
         attr_values[self.name] = value

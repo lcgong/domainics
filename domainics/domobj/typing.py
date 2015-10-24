@@ -37,7 +37,9 @@ def cast_attr_value(attrname, val, attr_type):
 
     try:
         if isinstance(val, str) and issubclass(attr_type, (datetime, date)):
+
             val = arrow.get(val).datetime
+            # print(5555, attrname, val, val.__class__, attr_type)
             if issubclass(attr_type, datetime):
                 return val
             else:
