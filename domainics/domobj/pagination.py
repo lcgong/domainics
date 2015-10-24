@@ -106,6 +106,14 @@ class DPage:
         page = DPage(start=self.start, limit=self.limit, sortable=sortable)
         return page
 
+    def set_sortable(sortable):
+        """
+        set_sortable([('attr_name', true_or_false)])
+        """
+        self.sortable.clear()
+        for attr_name, ascending in sortable:
+            self.sortable.append(_sortable_field(attr_name, ascending))
+
     def format_content_range(self):
 
         if self.start is None:
