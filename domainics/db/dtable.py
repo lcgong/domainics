@@ -117,8 +117,6 @@ class dsequence:
             errmsg += other.__class__.__name__
             raise TypeErro(errmsg)
 
-        print(self.__value, other_value, self.__value == other_value)
-
         if isinstance(self.__value, int) and isinstance(other_value, int):
             return self.__value == other_value;
 
@@ -132,3 +130,16 @@ class dsequence:
             return repr(self.__value)
         else:
             return self.__class__.__name__ + '(' + ')'
+
+    def __dobject_cast__(self, target_type):
+        if issubclass(target_type, dsequence):
+            return self
+
+        elif issubclass(target_type, int):
+            if self.__value is _NOT_ALLOCATED:
+                return self
+            else:
+                return self.__value
+
+        else:
+            raise TypeError("Unknown type: " + target_type.__name__)

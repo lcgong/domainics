@@ -338,13 +338,7 @@ class DSetBaseImpl(DSetBase, dobject):
 
         subst_values = self._item_value_subst()
 
-        # ------------------------------------------------------------
-
-        print(3334, subst_values)
-        print(3335, obj)
-
         obj = item_cls(obj, **subst_values) # clone it and replace its values
-
         self.__dset_item_dict__[obj.__dobject_key__] = obj
 
         return self
@@ -452,5 +446,7 @@ class DSetBaseImpl(DSetBase, dobject):
                 self._add(obj)
         elif isinstance(value, DObject):
             self._add(value)
+        else:
+            raise TypeError('should be a dobject, dset or iterable object')
 
         return self  # operator 'o.x += a', o.x = o.x.__iadd__(a)

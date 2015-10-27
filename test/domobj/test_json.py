@@ -24,9 +24,19 @@ def test_json():
 
 
     a = A(a_sn = 101)
+    a.b._add(B(line=1, name='n1'))
+    a.b._add(B(line=2, name='n2'))
+    assert len(a.b) == 2
+
+    a = A(a_sn = 101)
+
     a.b += [B(line=1, name='n1'), B(line=2, name='n2')]
+    print(id(a.b.__dset_item_dict__), a.b.__dset_item_dict__)
+
+    assert len(a.b) == 2
 
     json1 = a.__json_object__()
+    print(json1)
 
     assert json1['a_sn'] == 101
     assert json1['b'][0]['a_sn'] == 101

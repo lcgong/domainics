@@ -7,6 +7,7 @@ from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from numbers import Number
 
+
 class DObject:
     pass
 
@@ -52,7 +53,7 @@ def cast_attr_value(attrname, val, attr_type):
             else:
                 return attr_type(val)
         else:
-                return attr_type(val)
+            return attr_type(val)
 
     except (ValueError, TypeError) as ex:
         err = "The attribute '%s' should be \'%s\' type, not '%s'"

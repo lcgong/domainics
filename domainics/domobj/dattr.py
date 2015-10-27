@@ -37,11 +37,11 @@ class datt(DAttribute):
         if attr_value is None:
             if hasattr(self.type, '__default_value__'):
                 attr_value = self.type.__default_value__()
-                self.set_value_unguardedly(instance, attr_value)
+                instance.__value_dict__[self.name] = attr_value
 
             elif self.default is not None:
                 attr_value = self.initialize(instance)
-                self.set_value_unguardedly(instance, attr_value)
+                instance.__value_dict__[self.name] = attr_value
 
         return attr_value
 
@@ -98,18 +98,25 @@ class datt(DAttribute):
 
         attr_values  = instance.__value_dict__
         if issubclass(self.type, DSetBase) and isinstance(value, Iterable):
+
             if self.name not in attr_values:
                 attr_value = self.initialize(instance)
                 attr_value += value
                 attr_values[self.name] = attr_value
             else:
                 attr_value = attr_values[self.name]
-                attr_value._clear()
-                attr_value += value
+                if value is not attr_value : # important!
+                    attr_value._clear()
+                    attr_value += value
 
             return
+
         elif hasattr(self.type, '__setter_filter__'):
             value = self.type.__setter_filter__(value)
+
+        elif hasattr(value.__class__, '__dobject_cast__'):
+            value = value.__dobject_cast__(self.type)
+
         else:
             # print(2222, self.name, value, value.__class__.__name__, self.type)
             value = cast_attr_value(self.name, value, self.type)
