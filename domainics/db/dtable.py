@@ -56,11 +56,16 @@ _NOT_ALLOCATED = object()
 
 class dsequence:
     """"""
-    def __init__(self, value = _NOT_ALLOCATED):
-        if value is None or value is _NOT_ALLOCATED or isinstance(value, int):
+    def __init__(self, value = None):
+        if isinstance(value, int):
             self.__value = value
+
+        elif value is None:
+            self.__value = value
+
         elif isinstance(value, str):
             self.__value = int(value)
+
         else:
             err = 'dsequence should be integer, not %s'
             err %= value.__class__.__name__
@@ -72,36 +77,36 @@ class dsequence:
 
     @property
     def value(self):
-        if self.__value is _NOT_ALLOCATED:
-            return None
-            # err = 'The sequence number %s is not allocated'
-            # err %= self.__class__.__name__
-            # raise ValueError(err)
-
         return self.__value
 
     @value.setter
     def value(self, newval):
         if isinstance(newval, int):
             self.__value = newval
-        # else:
-        #     return None
-            # err = 'The sequence value should be int, not %s'
-            # err %= newval.__class__.__name__
-            # raise TypeError(err)
+
+        elif isinstance(newval, dsequence):
+            self.__value = newval.__value
+
+        elif isinstance(newval, str):
+            self.__value = int(str)
+
+        else:
+            err = 'The sequence value should be int, not %s'
+            err %= newval.__class__.__name__
+            raise TypeError(err)
 
     @property
     def allocated(self):
-        return self.__value is not _NOT_ALLOCATED
+        return self.__value is not None
 
     def __bool__(self):
-        return self.__value is not _NOT_ALLOCATED
+        return self.__value is not None
 
     def __int__(self):
         return self.value
 
     def __json_object__(self):
-        if self.__value is not None and self.__value is not _NOT_ALLOCATED:
+        if self.__value is not None:
             return int(self)
 
         return None
@@ -117,7 +122,7 @@ class dsequence:
             errmsg += other.__class__.__name__
             raise TypeErro(errmsg)
 
-        if isinstance(self.__value, int) and isinstance(other_value, int):
+        if self.__value is not None and other_value is not None:
             return self.__value == other_value;
 
         return id(self) == id(other)
@@ -129,15 +134,15 @@ class dsequence:
         if self.__value is not None:
             return repr(self.__value)
         else:
-            return self.__class__.__name__ + '(' + ')'
+            return "<dsequence at 0x%x, unallocated>" % id(self)
 
     def __dobject_cast__(self, target_type):
         if issubclass(target_type, dsequence):
             return self
 
         elif issubclass(target_type, int):
-            if self.__value is _NOT_ALLOCATED:
-                return self
+            if self.__value is None:
+                return None
             else:
                 return self.__value
 
