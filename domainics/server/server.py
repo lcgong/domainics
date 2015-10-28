@@ -30,6 +30,8 @@ def run_forever(application, port=None, num_processes=1) :
         elif isinstance(port, Mapping):
             for p in port:
                 ports.append(p)
+        elif isinstance(port, int):
+            ports.append(port)
 
     if not ports:
         ports.append(8888)

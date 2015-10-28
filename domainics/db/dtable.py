@@ -52,8 +52,6 @@ class json_object(object):
         raise ValueError("the assigned value type should be one of"
                          " 'list', 'dict'")
 
-_NOT_ALLOCATED = object()
-
 class dsequence:
     """"""
     def __init__(self, value = None):
