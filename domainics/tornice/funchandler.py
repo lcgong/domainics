@@ -173,7 +173,8 @@ def parse_arguments(handler, service_func, path_signature, args, kwargs):
                     #     return None
                     # else:
                     try:
-                        arg_val = ann_type(arg_val)
+                        if arg_val is not None:
+                            arg_val = ann_type(arg_val)
                     except TypeError as exc :
                         errmsg = ("while parsing arg '%s' of %s, "
                                   "caught an exception: ")
