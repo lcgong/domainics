@@ -166,7 +166,7 @@ class DSetBaseImpl(DSetBase, dobject):
         arg_name = "_page"
         if arg_name in kwargs:
             pagination = kwargs.pop(arg_name)
-            if not isinstance(pagination, DPage):
+            if pagination is not None and not isinstance(pagination, DPage):
                 err = "The pagination '_page' should be a DPage object"
                 raise ValueError(err)
 
