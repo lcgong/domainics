@@ -213,7 +213,6 @@ class BaseSQLBlock:
                 selected.append(i)
                 colnames.append(colname)
 
-        print(colnames)
         for record in self._cursor:
 
             obj = dict((k, v) for k, v in

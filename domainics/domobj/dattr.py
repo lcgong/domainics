@@ -46,7 +46,6 @@ class datt(DAttribute):
         return attr_value
 
     def __set__(self, instance, value):
-        print(instance.__class__, instance.__class__.__dobject_key__)
         if self.name in instance.__class__.__dobject_key__:
             errmsg = "The primary key attribute '%s' is read-only"
             errmsg %= self.name
@@ -118,7 +117,6 @@ class datt(DAttribute):
             value = value.__dobject_cast__(self.type)
 
         else:
-            # print(2222, self.name, value, value.__class__.__name__, self.type)
             value = cast_attr_value(self.name, value, self.type)
 
         attr_values[self.name] = value

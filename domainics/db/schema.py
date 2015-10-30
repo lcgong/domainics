@@ -78,7 +78,6 @@ def repr_datatype(dtype, length=None):
         if not length:
             datatype = 'TEXT'
         else:
-            # print('%r, %s' % (length, length.__class__))
             datatype = 'VARCHAR(%d)' % length
 
     elif dtype == float:
@@ -230,7 +229,6 @@ class DBSchema:
                     for stmt in repr_create_sequence(db_cls):
                         stmts.append(stmt)
             except Exception as ex:
-                # print(ex)
                 errmsg = 'caught exception while scheming %s (%r)'
                 errmsg %= (db_cls.__name__, ex)
                 # raise TypeError(errmsg) from ex

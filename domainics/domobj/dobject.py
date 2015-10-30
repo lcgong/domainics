@@ -101,7 +101,6 @@ class dobject(DObject, metaclass=DObjectMetaClass):
                 errmsg %= (arg_name, cls.__name__)
                 raise ValueError(errmsg)
 
-            # print(111, arg_name, arg_value, arg_value.__class__.__name__)
             attr.set_value_unguardedly(instance, arg_value)
             seen.add(arg_name)
 

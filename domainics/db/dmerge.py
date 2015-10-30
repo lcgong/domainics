@@ -136,7 +136,6 @@ def pq_dtable_merge(current, past):
                    cols=', '.join(cols),
                    vals=', '.join(['%s'] * len(cols)))
 
-        print(sql)
         dbc << sql
         dbc << values
 

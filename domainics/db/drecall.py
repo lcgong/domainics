@@ -47,7 +47,6 @@ def _recall_dobject(obj):
         pk_values.append(val)
 
 
-    # print(3123, pk_values)
     dbc << sql << tuple(pk_values)
     origin = next(dbc)
     if origin is not None:
