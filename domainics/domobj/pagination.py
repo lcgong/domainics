@@ -106,7 +106,7 @@ class DPage:
         page = DPage(start=self.start, limit=self.limit, sortable=sortable)
         return page
 
-    def set_sortable(sortable):
+    def set_sortable(self, sortable):
         """
         set_sortable([('attr_name', true_or_false)])
         """
