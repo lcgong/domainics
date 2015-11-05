@@ -116,9 +116,10 @@ class dsequence:
         elif isinstance(other, dsequence):
             other_value = other.__value
         else:
-            errmsg = 'required type: dsequence or int, not: '
-            errmsg += other.__class__.__name__
-            raise TypeErro(errmsg)
+            return False
+            # errmsg = 'required type: dsequence or int, not: '
+            # errmsg += other.__class__.__name__
+            # raise TypeError(errmsg)
 
         if self.__value is not None and other_value is not None:
             return self.__value == other_value;
