@@ -47,10 +47,6 @@ def load(homepath=None):
     _logger = logging.getLogger(__name__)
     _logger.info('configuration loaded, ' + conf_file)
 
-    abcs =logging.getLogger('abcs')
-
-    abcs.info('test')
-
     conf_file = fp.join(conf_dir, 'database.yaml')
     if fp.exists(conf_file):
         with open(conf_file) as f:
