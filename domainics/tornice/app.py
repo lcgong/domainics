@@ -93,17 +93,27 @@ class Application(tornado.web.Application):
                             code_lineno = code_lineno )
 
 
-    def redirect(self, pattern, status_code=404, reason=None):
+    def add_redirect(self, pattern, path=None, status_code=None, reason=None):
+
         frame = sys._getframe(1)
         code_lineno = frame.f_lineno
         code_filename = frame.f_code.co_filename
+        if path is not None:
+            kwargs = dict(status_code = status_code, reason = reason)
 
-        kwargs = dict(status_code = status_code, reason = reason)
+            self._add_handler(pattern, RaiseErrorHandler, kwargs=kwargs,
+                                priority=100,
+                                code_filename = code_filename,
+                                code_lineno = code_lineno )
 
-        self._add_handler(pattern, RaiseErrorHandler, kwargs=kwargs,
-                            priority=100,
-                            code_filename = code_filename,
-                            code_lineno = code_lineno )
+        elif status_code is not None:
+
+            kwargs = dict(status_code = status_code, reason = reason)
+
+            self._add_handler(pattern, RaiseErrorHandler, kwargs=kwargs,
+                                priority=100,
+                                code_filename = code_filename,
+                                code_lineno = code_lineno )
 
 
     def add_module(self, pkg_or_module, priority=50):

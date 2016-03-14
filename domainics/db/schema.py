@@ -148,12 +148,12 @@ def repr_create_sequence(dobj_cls):
             yield sql
 
 def repr_drop_table(dobj_cls):
-    s = "DROP TABLE IF EXISTS %s;"
+    s = "DROP TABLE IF EXISTS %s ;"
     s %= dobj_cls.__name__
     yield s
 
 def repr_drop_sequence(dobj_cls):
-    s = "DROP SEQUENCE IF EXISTS %s;"
+    s = "DROP SEQUENCE IF EXISTS %s ;"
     s %= dobj_cls.__name__
     yield s
 
