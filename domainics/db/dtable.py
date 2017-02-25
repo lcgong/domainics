@@ -46,7 +46,7 @@ class json_object(object):
         if value is None:
             return None
 
-        if issubclass(value.__class__, (list, dict)):
+        if issubclass(value.__class__, (list, dict, str)):
             return value
 
         raise ValueError("the assigned value type should be one of"

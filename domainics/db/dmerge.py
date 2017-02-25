@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import datetime
+import json
+
 from decimal import Decimal
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
@@ -63,7 +65,7 @@ def _dtable_diff(current, past):
             attr_value = getattr(obj, attr_name)
 
             if (issubclass(attr.type, json_object)
-                    and isinstance(attr_value, str)):  # json cast
+                    and not isinstance(attr_value, str)):  # json cast
                 attr_value = json.dumps(attr_value)
 
             attr_values.append(attr_value)
