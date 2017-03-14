@@ -52,11 +52,12 @@ def run_forever(application, port=None, num_processes=1) :
     httpserver.start(num_processes)
 
     ioloop = tornado.ioloop.IOLoop.instance()
-    def sigint_int(s, f):
+    def shutdown(s, f):
         logger.info('server is shutting')
         ioloop.add_callback(ioloop.stop)
 
-    signal.signal(signal.SIGINT, sigint_int)
+    signal.signal(signal.SIGINT, shutdown)
+    signal.signal(signal.SIGTERM, shutdown)
 
     print('Server Started. Press <CRTL-C> to kill server')
     ioloop.start() # 启动服务器

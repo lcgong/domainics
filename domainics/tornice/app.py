@@ -92,6 +92,25 @@ class Application(tornado.web.Application):
                             code_filename = code_filename,
                             code_lineno = code_lineno )
 
+    def add_handler(self, pattern, handler, **kwargs):
+        """
+        :param static_folder:
+        :param url_path: URL path pattern
+        :param folder:
+        :param index: the index file in URL path
+        :param default: the default path if the url path is not accessible.
+        """
+
+        frame = sys._getframe(1)
+        code_lineno = frame.f_lineno
+        code_filename = frame.f_code.co_filename
+
+        self._start_frame = sys._getframe(1)
+
+        self._add_handler(pattern, handler, kwargs=kwargs,
+                            priority=100,
+                            code_filename = code_filename,
+                            code_lineno = code_lineno )
 
     def add_redirect(self, pattern, path=None, status_code=None, reason=None):
 
