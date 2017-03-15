@@ -4,14 +4,18 @@ import logging
 _logger = logging.getLogger(__name__)
 
 import re
-from psycopg2.pool import ThreadedConnectionPool
 
 
 from .sqlblock import BaseSQLBlock
 from .dtable import dsequence
 
+import psycopg2.extensions
+import psycopg2.extras
+psycopg2.extensions.register_adapter(dict, psycopg2.extras.Json)
 
-import psycopg2.extensions as _pgext 
+from psycopg2.pool import ThreadedConnectionPool
+
+import psycopg2.extensions as _pgext
 # _pgext.register_type(_pgext.UNICODE)
 # _pgext.register_type(_pgext.UNICODEARRAY)
 
@@ -43,7 +47,7 @@ class PostgreSQLBlock(BaseSQLBlock):
         self._cursor = self._conn.cursor()
 
     def _close(self):
-        if self._cursor: 
+        if self._cursor:
             self._cursor.close()
             self._cursor = None
 
@@ -63,7 +67,7 @@ class PostgreSQLBlock(BaseSQLBlock):
         s = "SELECT nextval(%(seq)s) FROM generate_series(1, %(cnt)s) s"
         cur.execute(s, dict(seq=seq, cnt=batch_cnt))
         return (r[0] for r in  cur.fetchall())
-    
+
 
     @staticmethod
     def _has_params(sqlstmt):
@@ -71,4 +75,3 @@ class PostgreSQLBlock(BaseSQLBlock):
 
 
 _ptn_sqlparams = re.compile(r'%(?:s|\(\w+\)s)')
-
