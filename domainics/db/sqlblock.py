@@ -14,8 +14,26 @@ from ..domobj   import dobject
 
 from ..pillar   import P
 
-_dsn_class = {}
 
+""" 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
+
+@transaction
+
+@transaction()
+
+@transaction(auto_commit=True, dsn='other_db')
+
+具体使用，必须提供第一个参数
+@transaction()
+def do_something(self, arg):
+    ...
+    return ...
+
+如果该实例已经存在非空的sql属性则会抛出AttributeError
+"""
+
+
+_dsn_class = {}
 def set_dsn(**kwargs):
     ''' '''
     dbsys = kwargs.pop('sys', 'postgres')
@@ -249,73 +267,72 @@ from collections import namedtuple
 
 _DBSource = namedtuple('DBSource', ['dsn', 'autocommit'])
 
-def transaction(*d_args, dsn='DEFAULT', autocommit=False, alias="sql"):
-    """ 对函数方法装配sqlblock，实例会增加sql属性，无异常结束提交事务，有异常则回滚.
+pillar_has_name = P.__pillar__.has_name
+pillar_confine = P.__pillar__.confine
 
-    @transaction
+class TransactionDecorator:
 
-    @transaction()
+    def __init__(self, alias='sql'):
+        self.alias = alias
 
-    @transaction(auto_commit=True, dsn='other_db')
+    def __getattr__(self, alias): # new decorator for a new alias
+        transaction = TransactionDecorator(alias)
+        return transaction
 
-    具体使用，必须提供第一个参数
-    @transaction()
-    def do_something(self, arg):
-        ...
-        return ...
+    def __call__(self, *d_args, dsn='DEFAULT', autocommit=False, alias=None):
+        if alias is None:
+            alias = self.alias
 
-    如果该实例已经存在非空的sql属性则会抛出AttributeError
-    """
-    pillar_has_name = P.__pillar__.has_name
-    pillar_confine = P.__pillar__.confine
+        def _decorator(func):
+            __sqlblock_sources__ = getattr(func, '__sqlblock_sources__', None)
+            if __sqlblock_sources__ is None:
+                __sqlblock_sources__ = {}
+                setattr(func, '__sqlblock_sources__', __sqlblock_sources__)
 
-    def _decorator(func):
-        __sqlblock_sources__ = getattr(func, '__sqlblock_sources__', None)
-        if __sqlblock_sources__ is None:
-            __sqlblock_sources__ = {}
-            setattr(func, '__sqlblock_sources__', __sqlblock_sources__)
+            __sqlblock_sources__[alias] = _DBSource(dsn, autocommit)
 
-        __sqlblock_sources__[alias] = _DBSource(dsn, autocommit)
+            def sqlblock_wrapper(*args, **kwargs):
 
-        def sqlblock_wrapper(*args, **kwargs):
+                # if pillar_has_name(alias): # forbid to reenter a transaction
+                #     return func(*args, **kwargs)
 
-            # if pillar_has_name(alias): # forbid to reenter a transaction
-            #     return func(*args, **kwargs)
+                # else:
+                blocks = {}
+                for alias, src in __sqlblock_sources__.items():
+                    if pillar_has_name(alias):
+                        # forbid to reenter a sqlblock of transaction
+                        continue
+                        # return func(*args, **kwargs)
+                    blocks[alias] = sqlblock(dsn=src.dsn, autocommit=src.autocommit)
 
-            # else:
-            blocks = {}
-            for alias, src in __sqlblock_sources__.items():
-                if pillar_has_name(alias):
-                    # forbid to reenter a sqlblock of transaction
-                    continue
-                    # return func(*args, **kwargs)
-                blocks[alias] = sqlblock(dsn=src.dsn, autocommit=src.autocommit)
+                if blocks:
+                    def callback(etyp, eval, tb):
+                        for sqlblk in blocks.values():
+                            sqlblk.__exit__(etyp, eval, tb)
 
-            if blocks:
-                def callback(etyp, eval, tb):
+                    bound_func = pillar_confine(func, **blocks, exit_callback=callback)
+
+                    # bound_func = _pillar_history.bound(func,
+                    #                             [(dbc, sqlblk)], exit_callback)
+
                     for sqlblk in blocks.values():
-                        sqlblk.__exit__(etyp, eval, tb)
+                        sqlblk.__enter__()
 
-                bound_func = pillar_confine(func, **blocks, exit_callback=callback)
+                    return bound_func(*args, **kwargs)
+                else:
+                    return func(*args, **kwargs)
+                #     bound_func = func
+                #
+                # return func(*args, **kwargs)
 
-                # bound_func = _pillar_history.bound(func,
-                #                             [(dbc, sqlblk)], exit_callback)
+            functools.update_wrapper(sqlblock_wrapper, func)
+            return sqlblock_wrapper
 
-                for sqlblk in blocks.values():
-                    sqlblk.__enter__()
+        if len(d_args) == 1 and callable(d_args[0]):
+            # no argument decorator
+            return _decorator(d_args[0])
+        else:
+            return _decorator
 
-                return bound_func(*args, **kwargs)
-            else:
-                return func(*args, **kwargs)
-            #     bound_func = func
-            #
-            # return func(*args, **kwargs)
 
-        functools.update_wrapper(sqlblock_wrapper, func)
-        return sqlblock_wrapper
-
-    if len(d_args) == 1 and callable(d_args[0]):
-        # no argument decorator
-        return _decorator(d_args[0])
-    else:
-        return _decorator
+transaction = TransactionDecorator()
