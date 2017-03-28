@@ -4,6 +4,8 @@ import sys
 
 import inspect
 
+from inspect import iscoroutinefunction, isgeneratorfunction, isfunction
+
 class History:
     '''object timeline history'''
 
@@ -34,14 +36,56 @@ class History:
 
         envs = self._frames[frame]
         envs[name] = value
-        # print('ENTER:', frame, self._frames[frame])
-
 
     def pop(self, frame, name):
-        # print(' EXIT:', frame, self._frames[frame])
         del self._frames[frame][name]
         if not self._frames[frame] :
             del self._frames[frame]
+
+    def get(self, name, frame=None):
+        """ define name on pillar at a frame"""
+        if frame is None:
+            frame = sys._getframe(1)
+
+        value = self.top(frame, name)
+
+        return value
+
+    def let(self, **kwargs):
+        """ define name on pillar at a frame"""
+        frame = kwargs.pop('_frame', None)
+        if frame is None:
+            frame = sys._getframe(1)
+
+        ctx = self.current_context(frame)
+        if ctx is None:
+            raise NoConfineError('no confined function: ' + frame.f_code.co_name)
+
+        for k, v in kwargs.items():
+            ctx[k] = v
+
+    def clear_context(self, frame):
+        """ clear a frame on pillar """
+        if frame in self._frames :
+            del self._frames[frame]
+
+
+    def has_name(self, name, frame=None) :
+        """find the top object at frame stack"""
+        if frame is None:
+            frame = sys._getframe(1)
+
+        while frame:
+            objs = self._frames.get(frame)
+            if objs is not None and name in objs:
+                return True
+
+            if frame == self._start_frame:
+                break
+
+            frame = frame.f_back
+
+        return False
 
     def top(self, frame, name) :
         """find the top object at frame stack"""
@@ -57,7 +101,59 @@ class History:
 
             frame = frame.f_back
 
+        raise NoBoundObjectError(name)
+
+
+    def current_context(self, frame):
+        while frame:
+            context = self._frames.get(frame, None)
+            if context is not None:
+                return context
+
+            if frame == self._start_frame:
+                break
+
+            frame = frame.f_back
+
         return None
+
+    def printHist(self, frame=None) :
+        if frame is None:
+            frame = sys._getframe(1)
+
+        while frame:
+            objs = self._frames.get(frame, None)
+            if objs:
+                print(123, frame, objs)
+            else:
+                print(456, frame)
+
+            if frame == self._start_frame:
+                break
+
+            frame = frame.f_back
+
+    def confine(self, *args, exit_callback=None, **kwargs):
+        """
+        @confine
+        def func() :
+            pass
+
+        @confine(a=1, b=2, exit_callback=..)
+        def funct():
+            pass
+
+        co_func = confine(func, a=1, b=2, exit_callback=exit_func)
+        """
+
+        if len(args) > 0:
+            f = args[0]
+            if iscoroutinefunction(f) or isfunction(f) or isgeneratorfunction(f):
+                return self.bound(f, kwargs.items(), exit_callback=exit_callback)
+        else:
+            return lambda f : self.bound(f, kwargs.items(), exit_callback=exit_callback)
+
+        # return self.bound(func, [], exit_callback=None)
 
     def bound(self, func, bindings, exit_callback=None):
         """ bound func with binding pillars.
@@ -68,63 +164,109 @@ class History:
         :param exit_callback: a callback function with three arguments. exit_callback(exc_type, exc_val, tb)
         """
 
-        def bound_func(*args, **kwargs):
-            frame = sys._getframe(1)
+        if inspect.iscoroutinefunction(func):
+            async def _bound_coroutine_func(*args, **kwargs):
+                coroutine = func(*args, **kwargs)
+                frame = coroutine.cr_frame
 
-            if self.has_frame(frame):
-                errmsg = 'cannot reenter the same frame(%s)' % frame
-                raise PillarError(errmsg)
+                if frame in self._frames:
+                    errmsg = 'cannot reenter the same frame(%s)' % frame
+                    raise PillarError(errmsg)
 
-            for pillar, obj in bindings:
-                self.push(frame, id(pillar), obj)
+                assert frame not in self._frames
+                self._frames[frame] = {}
+                for k, v in bindings:
+                    self.push(frame, k, v)
 
-            ret = None
-            try:
-                ret = func(*args, **kwargs)
-            finally:
-                for pillar, _ in bindings:
-                    self.pop(frame, id(pillar))
-                if inspect.isgenerator(ret):
-                    ret = self._confine_gen(bindings, ret, exit_callback)
-                else:
+                ret = None
+                try:
+                    ret = await coroutine
+                finally:
+                    self.clear_context(frame)
+
                     if exit_callback:
                         exc_type, exc_val, tb = sys.exc_info()
                         exit_callback(exc_type, exc_val, tb)
 
-            return ret
+                return ret
 
-        return bound_func
+            return _bound_coroutine_func
 
+        elif inspect.isgeneratorfunction(func):
+            def _bound_func(*args, **kwargs):
+                generator = func(*args, **kwargs)
 
-    def _confine_gen(self, bindings, generator, closed_callback=None):
-        # generator = genfunc()
-        frame = generator.gi_frame
-        for pillar, obj in bindings:
-            self.push(frame, id(pillar), obj)
+                frame = generator.gi_frame
+                if frame in self._frames:
+                    errmsg = 'cannot reenter the same frame(%s)' % frame
+                    raise PillarError(errmsg)
 
-        def _closed_handler(exc_type, exc_val, tb):
-            if closed_callback:
-                if exc_type == StopIteration:
-                    return
+                assert frame not in self._frames
+                self._frames[frame] = {}
 
-                closed_callback(exc_type, exc_val, tb)
+                for pillar, obj in bindings:
+                    self.push(frame, id(pillar), obj)
 
-            nonlocal frame
-            for pillar, _ in bindings:
-                self.pop(frame, id(pillar))
+                def _closed_handler(exc_type, exc_val, tb):
+                    if exit_callback:
+                        if exc_type == StopIteration:
+                            return
 
-        proxied = GeneratorClosedProxy(generator, _closed_handler)
-        def wrapped_genfunc():
-            nonlocal proxied
-            yield from proxied
+                        exit_callback(exc_type, exc_val, tb)
 
-        return proxied
+                    self.clear_context(frame)
+
+                proxied = GeneratorClosedProxy(generator, _closed_handler)
+                # proxied = setup_closed_state_func(generator, _closed_handler)
+                return proxied
+
+            return _bound_func
+
+        elif inspect.isfunction(func):
+            def _bound_func(*args, **kwargs):
+                frame = sys._getframe(1)
+
+                if frame in self._frames:
+                    # For async generator, this oringal func is called again
+                    # in the same frame of coroutine.
+                    return func(*args, **kwargs)
+
+                assert frame not in self._frames
+                self._frames[frame] = {}
+                for pillar, obj in bindings:
+                    self.push(frame, id(pillar), obj)
+
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    self.clear_context(frame)
+                    if exit_callback:
+                        exc_type, exc_val, tb = sys.exc_info()
+                        exit_callback(exc_type, exc_val, tb)
+
+            return _bound_func
+
 
 class PillarError(Exception):
     pass
 
 class NoBoundObjectError(PillarError):
     pass
+
+class NoConfineError(PillarError):
+    pass
+
+
+class Pillars:
+    __slots__ = ('__pillar__')
+
+    def __init__(self, history):
+        self.__pillar__ = history
+
+    def __getattr__(self, name):
+        getter = self.__pillar__.get
+        return getter(name, frame=sys._getframe(1))
+
 
 def pillar_class(theclass, excludes=None):
     """make pillar class like theclass"""
@@ -222,103 +364,45 @@ def pillar_class(theclass, excludes=None):
 
     return type('Pillar', (object,), attrs)
 
+
+
 class GeneratorClosedProxy:
-    __slots__ = ('_gen_obj', '_closed_callback')
+    __slots__ = ('__gen_obj__', '__closed_callback__')
 
     def __init__(self, genobj, closed_callback):
-        """ """
-        object.__setattr__(self, "_gen_obj", genobj)
-        object.__setattr__(self, "_closed_callback", closed_callback)
-
-        print(self, genobj)
+        self.__gen_obj__ = genobj
+        self.__closed_callback__ = closed_callback
 
     def __getattribute__(self, name):
-        print(name)
-        return getattr(object.__getattribute__(self, "_gen_obj"), name)
+        return getattr(object.__getattribute__(self, "__gen_obj__"), name)
 
     def __next__(self):
         """ """
-        genobj = object.__getattribute__(self, "_gen_obj")
+        genobj = object.__getattribute__(self, "__gen_obj__")
         try:
-            return genobj.__getattribute__('__next__')()
+            return genobj.__next__()
         except :
-
             if inspect.getgeneratorstate(genobj) == 'GEN_CLOSED':
                 etype, eval, tb = sys.exc_info()
-                object.__getattribute__(self, "_closed_callback")(etype, eval, tb)
+                object.__getattribute__(self, "__closed_callback__")(etype, eval, tb)
 
             raise
 
     def __del__(self):
-        obj = object.__getattribute__(self, "_gen_obj")
+        obj = object.__getattribute__(self, "__gen_obj__")
         if hasattr(obj, '__del__'):
-            getattr(obj, '__del__')()
+            obj.__del__()
 
         etype, eval, tb = sys.exc_info()
-        object.__getattribute__(self, "_closed_callback")(etype, eval, tb)
-
-
-    def __delattr__(self, name):
-        delattr(object.__getattribute__(self, "_gen_obj"), name)
-
-    def __setattr__(self, name, value):
-        setattr(object.__getattribute__(self, "_gen_obj"), name, value)
+        object.__getattribute__(self, "__closed_callback__")(etype, eval, tb)
 
     def __iter__(self) :
-        obj = object.__getattribute__(self, "_gen_obj")
+        obj = object.__getattribute__(self, "__gen_obj__")
         val = obj.__getattribute__('__iter__')()
         assert obj == val
         return self
 
-    def __doc__(self) :
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__doc__')
 
-    def __repr__(self):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return '<proxy %r at 0x%x>' % (obj, id(self))
-
-    def __hash__(self):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__hash__')()
-
-    def __format__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__format__')(*args, **kwargs)
-
-    def __reduce__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__reduce__')(*args, **kwargs)
-
-    def __reduce_ex__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__reduce_ex__')(*args, **kwargs)
-
-    def __eq__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__eq__')(*args, **kwargs)
-
-    def __ne__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__ne__')(*args, **kwargs)
-
-    def __gt__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__gt__')(*args, **kwargs)
-
-    def __ge__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__ge__')(*args, **kwargs)
-
-    def __le__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__le__')(*args, **kwargs)
-
-    def __lt__(self, *args, **kwargs):
-        obj = object.__getattribute__(self, "_gen_obj")
-        return obj.__getattribute__('__lt__')(*args, **kwargs)
-
-
-
+P = Pillars(History())
 
 _pillar_history = History()
