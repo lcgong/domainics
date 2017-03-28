@@ -68,7 +68,8 @@ def filter_traceback(tb, excludes=None):
         co = f.f_code
 
         name = co.co_name
-        modname = inspect.getmodule(co).__name__
+        co_mod = inspect.getmodule(co)
+        modname = co_mod.__name__ if co_mod else ''
         if excludes is not None:
             if any(modname.startswith(prefix) for prefix in excludes):
                 tb = tb.tb_next

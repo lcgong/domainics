@@ -255,8 +255,10 @@ def service_func_handler(proto, service_func, service_name, path_sig) :
 
         return result
 
-    def rest_handler(self, *args, **kwargs):
+    async def rest_handler(self, *args, **kwargs):
         obj = http_handler(self, *args, **kwargs)
+        if inspect.iscoroutine(obj):
+            obj = await obj
 
         if not isinstance(obj, (list, tuple, DSetBase)):
             obj = [obj] if obj is not None else []
