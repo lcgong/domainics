@@ -205,7 +205,7 @@ class History:
                 self._frames[frame] = {}
 
                 for pillar, obj in bindings:
-                    self.push(frame, id(pillar), obj)
+                    self.push(frame, pillar, obj)
 
                 def _closed_handler(exc_type, exc_val, tb):
                     if exit_callback:
@@ -233,8 +233,8 @@ class History:
 
                 assert frame not in self._frames
                 self._frames[frame] = {}
-                for pillar, obj in bindings:
-                    self.push(frame, id(pillar), obj)
+                for k, obj in bindings:
+                    self.push(frame, k, obj)
 
                 try:
                     return func(*args, **kwargs)

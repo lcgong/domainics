@@ -2,11 +2,15 @@
 
 import logging
 
+import sys
 import functools
+from string import Formatter
 from collections  import OrderedDict
+from collections.abc  import Iterable
 from collections  import namedtuple  as _namedtuple
 from itertools import chain as iter_chain
 from abc import abstractmethod
+from inspect import isgenerator
 
 from ..util     import nameddict   as _nameddict
 from ..pillar   import _pillar_history, pillar_class, PillarError, History
@@ -99,6 +103,107 @@ def make_record_dtable(dobj_cls):
         # for row in cursor:
         #     yield dobj_cls(**zip(colnames, (row[i] for i in colidxs))
 
+class SQLSegmentList(list):
+    pass
+
+_formatter = Formatter()
+class SQLText:
+    __tuple__ = ('_segments',)
+
+    def __init__(self, sep=''):
+        self._segments = SQLSegmentList()
+        self._sep = sep
+
+    def clear(self):
+        self._segments.clear()
+
+    def __bool__(self):
+        return bool(self._segments)
+
+    def __call__(self, *sql_texts, sep=None):
+        self._join(sql_texts, sep, sys._getframe(1))
+        return self
+
+    def __lshift__(self, sql_text):
+        self._join((sql_text,), None, sys._getframe(1))
+        return self
+
+    def _join(self, sql_texts, sep, frame):
+        if sep is None:
+            sep = self._sep
+
+        sql_text_iter = iter(sql_texts)
+        sql_text = next(sql_text_iter, None)
+        if sql_text:
+            if isgenerator(sql_text):
+                self._join(sql_text, sep, sql_text.gi_frame)
+            else:
+                segments = self._interpolate(sql_text, frame)
+                if segments:
+                    if self._segments:
+                        self._segments.append(SQLSegment(sep, frame))
+
+                    self._segments += segments
+
+        for sql_text in sql_text_iter:
+            if isgenerator(sql_text):
+                self._segments.append(SQLSegment(sep, frame))
+                self._join(sql_text, sep, sql_text.gi_frame)
+            else:
+                self._segments.append(SQLSegment(sep, frame))
+                self._segments += self._interpolate(sql_text, frame)
+
+    def _interpolate(self, sqltext, frame):
+        segments = []
+        for text, field_name, format_spec, conversion in _formatter.parse(sqltext):
+            segments.append(SQLSegment(text, frame))
+            if field_name:
+                val = eval(field_name, frame.f_globals, frame.f_locals)
+                if isinstance(val, SQLText):
+                    segments += val._segments
+                else:
+                    seg = SQLSegment('%s', frame)
+                    seg.values.append(val)
+                    segments.append(seg)
+
+        return segments
+
+    def get_statment(self):
+        sql_text = ''
+        sql_vals = []
+        for seg in self._segments:
+            sql_text += seg.text
+            sql_vals += seg.values
+
+        return sql_text, sql_vals
+
+class SQLSegment:
+
+    def __init__(self, text, frame):
+        self.offset = (0, 0) # lineno, charpos at line
+        self.text = text
+        self.values = []
+        self.frame = frame # frame.f_lineno frame.f_code.co_filename
+
+        # compute the offset of this segment
+        lines = text.splitlines()
+        if lines:
+            offset_lineno = len(lines) - 1
+            offset_charpos = len(lines[offset_lineno])
+
+            self.offset = (offset_lineno, offset_charpos)
+
+
+    def __repr__(self):
+        return f'SQLSegment(text=\"{self.text}\")'
+
+
+
+def sqltext(*sql_texts, sep=''):
+    sqltext = SQLText(sep=sep)
+    sqltext._join(sql_texts, sep, sys._getframe(1))
+    return sqltext
+
 class BaseSQLBlock:
     def __init__(self, dbms, dsn='DEFAULT', autocommit=False, record_type=None):
 
@@ -108,8 +213,9 @@ class BaseSQLBlock:
         self.dsn = dsn
         self.autocommit = autocommit
 
-        self._cur_record_type = None
-        self.__todo_sqlstmt   = None
+        # self._cur_record_type = None
+        self._iter = None
+        self._sql_builder = SQLText()
 
         self._logger = logging.getLogger(__name__)
 
@@ -119,6 +225,8 @@ class BaseSQLBlock:
 
     def __exit__ (self, etyp, ev, tb):
         try :
+            self._push()
+
             conn = self._conn
             cur  = self._cursor
             if not conn.autocommit and ev :
@@ -131,65 +239,31 @@ class BaseSQLBlock:
 
         return False
 
-    def __call__(self, stmt_or_params):
-        return self.__lshift__(stmt_or_params)
+    def __call__(self, *sql_texts, sep=''):
+        if self._iter:
+            self._iter.close()
+            self._iter = None
 
-    def __lshift__(self, stmt_or_params):
-        # """
-        # push SQL statement or parameters to dbc.
-        # #
-        # # dbc << 'SELECT %s'
-        # # dbc << (100,)
-        #
-        # """
-
-        if not stmt_or_params: # when '' or None is pushed, clear sql stmt
-            self.__todo_sqlstmt = None
-            return self
-
-        if isinstance(stmt_or_params, str): # sql stmt is pushed
-            if not self._has_params(stmt_or_params):
-                self.__todo_sqlstmt = None
-                self.__execute(stmt_or_params)
-                return
-            else:
-                self.__todo_sqlstmt = stmt_or_params
-            return self
-
-        # push params
-        if not self.__todo_sqlstmt:
-            err = 'NO SQL statement to solve the parameters: %r'
-            err %= stmt_or_params
-            raise ValueError(err)
-
-        if isinstance(stmt_or_params, list):
-            self.__execute(self.__todo_sqlstmt, many=stmt_or_params)
-            # self.__todo_sqlstmt = None
-        elif isinstance(stmt_or_params, (tuple, dict)):
-            self.__execute(self.__todo_sqlstmt, params=stmt_or_params)
-            # self.__todo_sqlstmt = None
-        elif isinstance(stmt_or_params, dobject):
-            params = stmt_or_params.export()
-            self.__execute(self.__todo_sqlstmt, params=params)
-        else:
-            err =  'statement should be strm and '
-            err += 'parameters should be a tuple, dict and list: %r'
-            err %= stmt_or_params
-            raise TypeError(err)
-
+        self._sql_builder._join(sql_texts, sep, sys._getframe(1))
         return self
 
-    def __execute(self, sql, params=None, many=None):
+    def __lshift__(self, sql_text):
+        if self._iter:
+            self._iter.close()
+            self._iter = None
 
-        if many is not None:
-            self._cursor.executemany(sql, many)
-        else:
-            self._cursor.execute(sql, params)
+        self._sql_builder._join([sql_text], '', sys._getframe(1))
+        return self
 
-        self._iter = None
-
+    def _push(self):
+        sql_stmt, sql_vals = self._sql_builder.get_statment()
+        if sql_stmt:
+            self._cursor.execute(sql_stmt, sql_vals)
+        self._sql_builder.clear()
 
     def __iter__(self):
+        self._push()
+
         self._iter = self._record_type(self._cursor)
         return self._iter
 
@@ -198,9 +272,12 @@ class BaseSQLBlock:
         try:
             return _iter.__next__()
         except StopIteration:
+            self._iter = None
             return None
-        finally:
-            self._cur_record_type = None
+
+    @property
+    def next(self):
+        return next(self)
 
     @property
     def rowcount(self):
@@ -241,6 +318,7 @@ class BaseSQLBlock:
             obj = dict((k, v) for k, v in
                                 zip(colnames, (record[i] for i in selected)))
             yield item_type(**obj)
+
 
 
 def _new_dobject(dobj_cls, attr_pairs):

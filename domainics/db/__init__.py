@@ -5,5 +5,5 @@ from .dtable import dtable, dsequence, array, json_object
 from .dmerge import dmerge
 from .drecall import drecall
 from .schema import DBSchema
-from .sqlblock import set_dsn, dbc, transaction
+from .sqlblock import set_dsn, dbc, transaction, sqltext
 from ..domobj import datt
