@@ -113,4 +113,5 @@ def test_insert():
     P.sql << 'INSERT INTO _test_sqlblock (sn, tags, data) VALUES {sql_values};'
 
     P.sql << "SELECT * FROM _test_sqlblock ORDER BY sn;"
+    rows = list(r for r in P.sql)
     assert len(rows) == 2
