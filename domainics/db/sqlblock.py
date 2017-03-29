@@ -34,6 +34,11 @@ def do_something(self, arg):
     return ...
 
 如果该实例已经存在非空的sql属性则会抛出AttributeError
+
+@transaction.sql_a
+
+@transaction(alias='sql_a')
+
 """
 
 
