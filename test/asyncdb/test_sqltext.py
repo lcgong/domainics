@@ -1,3 +1,4 @@
+import pytest
 
 from domainics.sqltext import SQL
 
@@ -24,3 +25,19 @@ def test_sqltext():
     s0 += '{age}' + ']'
     stmt, vals = s0.get_statment()
     assert stmt=='[$1]' and vals == [28]
+
+
+def test_sqltext2():
+    a, b = 1, 2
+
+    t = SQL("{g}{g+1}")
+    s = SQL("{a}{b}{c}[{t}]")
+    with pytest.raises(NameError):
+        stmt, vals = s.get_statment()
+
+    stmt, vals = s.get_statment(dict(b=10, c=20, g=30))
+    assert stmt == '$1$2$3[$4$5]'
+
+    assert vals[4] == 31
+
+    print(stmt, vals)

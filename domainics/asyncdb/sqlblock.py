@@ -72,18 +72,28 @@ class RecordCursor:
     def __init__(self, sqlblk):
         self._sqlblock = sqlblk
 
+        self._paramerters = None
+
         self._idx = None
         self._records = None
         self._n_records = None
         self._record_type = None
 
     async def execute(self):
-        sql_stmt, sql_vals = self._sqlblock._sqltext.get_statment()
+        sqltext = self._sqlblock._sqltext
+        self._sqlblock._sqltext = SQLText()
+
+        sql_stmt, sql_vals, is_many = sqltext.get_statment(self._paramerters)
         if not sql_stmt:
             return
 
+        if is_many:
+            await self._sqlblock._conn.executemany(sql_stmt, sql_vals)
+            self._idx = -1
+            return
+
         stmt = await self._sqlblock._conn.prepare(sql_stmt)
-        records = await stmt.fetch()
+        records = await stmt.fetch(*sql_vals)
         if not records:
             self._idx = -1
             return
@@ -99,7 +109,7 @@ class RecordCursor:
         return self
 
     async def __anext__(self):
-        if self._idx is None:
+        if self._sqlblock._sqltext:
             await self.execute()
 
         idx = self._idx
@@ -186,17 +196,19 @@ class BaseSQLBlock:
         return False
 
     def __lshift__(self, sqltext):
-        self._sqltext = SQLText()
         self._sqltext._join(sqltext, frame=sys._getframe(1))
         return self
 
     async def execute(self, **parameters):
+        self._cursor._paramerters = parameters
+        await self._cursor.execute()
 
-        self._cursor = RecordCursor(self)
+    async def executemany(self, parameters_list):
+        self._cursor._paramerters = parameters_list
         await self._cursor.execute()
 
     def __aiter__(self):
-        return  self._cursor or RecordCursor(self)
+        return  self._cursor
 
     def __iter__(self):
         if self._cursor._records is None:

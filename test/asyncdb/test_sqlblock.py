@@ -35,13 +35,18 @@ async def test_func1(dbconn, col):
     """
     await dbconn.execute()
 
-    #
-    dbconn << """\
-    INSERT INTO test_123 VALUES (1, 'a'), (2, 'b')
-    """
-    await dbconn.execute()
+    data = [(1, 'a'), (2, 'b'), (3, 'c')]
+    table_name = "test_123"
+    for sn, name in data:
+        dbconn << f"INSERT INTO {table_name} (sn, name) VALUES ({{sn}}, {{name}})"
+        # dbconn << f""
+        await dbconn.execute()
 
-    dbconn << SQL('SELECT sn, name FROM test_123')
+    data = [{"sn":4, "name":'d'}, {"sn":5, "name":'e'}, {"sn":6, "name":'f'}]
+    dbconn << "INSERT INTO test_123 (sn, name) VALUES ({sn}, {name})"
+    await dbconn.executemany(data)
+
+    dbconn << SQL('SELECT sn, name FROM test_123;')
     async for r in dbconn:
         print(r)
 
