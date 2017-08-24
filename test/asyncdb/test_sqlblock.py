@@ -10,11 +10,13 @@ from domainics.domobj import dobject, datt, dset
 
 from domainics.sqltext import SQL
 
-# def setup_module(module):
-set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
+
+def setup_module(module):
+    set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
+
 
 @transaction.dbconn(dsn='testdb')
-async def test_func1(dbconn, col):
+async def test_func1(dbconn, event_loop):
     dbconn << """\
     SELECT 1 as name
     """
@@ -66,8 +68,3 @@ async def test_func1(dbconn, col):
     BSet = dset(B)
     bset = BSet(dbconn)
     print(bset)
-
-import asyncio
-loop = asyncio.get_event_loop()
-loop.run_until_complete(test_func1(col=123))
-loop.close()

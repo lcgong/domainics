@@ -172,8 +172,15 @@ class BaseSQLBlock:
         self._cursor = RecordCursor(self)
         self._sqltext = SQLText()
 
+        self._outer_sqlblk = None # the outer sqlblock of nested function
+
 
     async def __enter__(self):
+        if self._outer_sqlblk:
+            print(123)
+            self._conn = self._outer_sqlblk._conn
+            return self
+
         pool = await _get_pool(self.dsn)
         if pool:
             self._conn = await pool.acquire()
@@ -183,6 +190,9 @@ class BaseSQLBlock:
         return self
 
     async def __exit__ (self, etyp, exc_val, tb):
+        if self._outer_sqlblk:
+            return False
+
         if exc_val :
             await self._transaction.rollback()
         else:
@@ -260,15 +270,24 @@ class TransactionDecorator:
                 raise TypeError(f"The argument '{self.alias}' should be declared"
                                 f" in {func.__name__} in {func.__module__}")
 
-            sqlblk = BaseSQLBlock(dsn=dsn)
-            newfunc = functools.partial(func, **{self.alias: sqlblk})
+
+
+            __sqlblk_obj = BaseSQLBlock(dsn=dsn)
+            __sqlblk_obj._alias = self.alias
+            newfunc = functools.partial(func, **{self.alias: __sqlblk_obj})
+
 
             async def _sqlblock_wrapper(*args, **kwargs):
-                await sqlblk.__enter__()
+
+                _outer_sqlblk = get_outer_sqlblock()
+                if _outer_sqlblk and _outer_sqlblk._alias == __sqlblk_obj._alias:
+                    __sqlblk_obj._outer_sqlblk = _outer_sqlblk
+
+                await __sqlblk_obj.__enter__()
                 try:
                     return await newfunc(*args, **kwargs)
                 finally:
-                    await sqlblk.__exit__(*sys.exc_info())
+                    await __sqlblk_obj.__exit__(*sys.exc_info())
 
 
             functools.update_wrapper(_sqlblock_wrapper, newfunc)
@@ -280,5 +299,14 @@ class TransactionDecorator:
         else:
             return _decorator
 
+def get_outer_sqlblock():
+    frame = sys._getframe(2)
+    while frame:
+        sqlblk = frame.f_locals.get('_TransactionDecorator__sqlblk_obj')
+        if sqlblk:
+            return sqlblk
+
+        frame = frame.f_back
+    return None
 
 transaction = TransactionDecorator()

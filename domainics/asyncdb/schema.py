@@ -6,9 +6,10 @@ from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
 # from .. import json
-from .sqlblock import transaction, dbc
+# from .sqlblock import transaction, dbc
 from .dtable import dtable, dsequence, json_object, DBArray
 from ..util     import iter_submodules
+from .sqlblock import set_dsn, transaction
 
 
 from ..domobj import dobject, dset, datt
@@ -169,7 +170,7 @@ class DBSchema:
             for stmt in stmts:
                 dbc << stmt
 
-        self.__tfunc = transaction(dsn)(execsql)
+        # self.__tfunc = transaction(dsn)(execsql)
 
     def add_module(self, root_module):
         """ """
@@ -206,7 +207,8 @@ class DBSchema:
 
                 self.schema_objs.append(obj)
 
-    def create(self):
+    @transaction.db(dsn="dba")
+    async def create(self, db):
         if not self.schema_objs:
             return
 
@@ -234,10 +236,12 @@ class DBSchema:
                 # raise TypeError(errmsg) from ex
                 raise
 
-        stmts = '\n'.join(stmts)
-        self.__tfunc(stmts)
+            db << '\n'.join(stmts)
+            await db.execute()
 
-    def drop(self):
+
+    @transaction.db(dsn="dba")
+    async def drop(self, db):
         if not self.schema_objs:
             return
 
@@ -257,5 +261,5 @@ class DBSchema:
                 for stmt in repr_drop_sequence(db_cls):
                     stmts.append(stmt)
 
-        stmts = '\n'.join(stmts)
-        self.__tfunc(stmts)
+            db << '\n'.join(stmts)
+            await db.execute()
