@@ -207,14 +207,13 @@ class DBSchema:
 
                 self.schema_objs.append(obj)
 
-    @transaction.db(dsn="dba")
-    async def create(self, db):
+    @transaction._dsn_db
+    async def create(self, _dsn_db=None):
         if not self.schema_objs:
             return
 
         seen = set()
 
-        stmts = ['\n']
         for db_cls in self.schema_objs:
             cls_name = db_cls.__module__ + '.' + db_cls.__name__
 
@@ -225,23 +224,22 @@ class DBSchema:
                 if issubclass(db_cls, dtable):
                     seen.add(cls_name)
                     for stmt in repr_create_table(db_cls):
-                        stmts.append(stmt)
+                        await _dsn_db.execute(stmt)
+
                 elif issubclass(db_cls, dsequence):
                     seen.add(cls_name)
                     for stmt in repr_create_sequence(db_cls):
-                        stmts.append(stmt)
+                        await _dsn_db.execute(stmt)
+
             except Exception as ex:
                 errmsg = 'caught exception while scheming %s (%r)'
                 errmsg %= (db_cls.__name__, ex)
                 # raise TypeError(errmsg) from ex
                 raise
 
-            db << '\n'.join(stmts)
-            await db.execute()
 
-
-    @transaction.db(dsn="dba")
-    async def drop(self, db):
+    @transaction._dsn_db
+    async def drop(self, _dsn_db=None):
         if not self.schema_objs:
             return
 
@@ -255,11 +253,9 @@ class DBSchema:
             if issubclass(db_cls, dtable):
                 seen.add(db_cls)
                 for stmt in repr_drop_table(db_cls):
-                    stmts.append(stmt)
+                    await _dsn_db.execute(stmt)
+
             elif issubclass(db_cls, dsequence):
                 seen.add(db_cls)
                 for stmt in repr_drop_sequence(db_cls):
-                    stmts.append(stmt)
-
-            db << '\n'.join(stmts)
-            await db.execute()
+                    await _dsn_db.execute(stmt)

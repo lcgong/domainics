@@ -40,6 +40,7 @@ import asyncpg
 from .dtable import dsequence
 
 
+
 _conn_pools = {}
 _datasources = {}
 
@@ -75,9 +76,11 @@ class RecordCursor:
     def __init__(self, sqlblk):
         self._sqlblock = sqlblk
 
-        self._paramerters = None
+        self._many_params = None
+        self._params = None
 
         self._idx = None
+        self._attr_names = None
         self._records = None
         self._n_records = None
         self._record_type = None
@@ -86,19 +89,37 @@ class RecordCursor:
         sqltext = self._sqlblock._sqltext
         self._sqlblock._sqltext = SQLText()
 
-        sql_stmt, sql_vals, is_many = sqltext.get_statment(self._paramerters)
+        if self._many_params is not None:
+            sql_stmt, sql_vals = sqltext.get_statment(many_params=self._many_params)
+            if not sql_stmt:
+                return
+
+            await self._sqlblock._conn.executemany(sql_stmt, sql_vals)
+            self._many_params = None
+            self._params = None
+
+            self._idx = -1
+            self._attr_names = None
+            self._records = None
+            self._n_records = None
+            self._record_type = None
+
+            return
+
+        sql_stmt, sql_vals = sqltext.get_statment(params=self._params)
         if not sql_stmt:
             return
 
-        if is_many:
-            await self._sqlblock._conn.executemany(sql_stmt, sql_vals)
-            self._idx = -1
-            return
+        # print(sql_stmt, sql_vals)
 
         stmt = await self._sqlblock._conn.prepare(sql_stmt)
         records = await stmt.fetch(*sql_vals)
         if not records:
             self._idx = -1
+            self._attr_names = None
+            self._records = None
+            self._n_records = None
+            self._record_type = None
             return
 
         self._attr_names = tuple(a.name for a in stmt.get_attributes())
@@ -168,12 +189,15 @@ class RecordCursor:
 
 class BaseSQLBlock:
     __tuple__ = ('dsn', '_sqltext', '_cursor',
-                 '_parent_sqlblk', '_decorated_func')
+                 '_parent_sqlblk', '_func_module', '_func_name')
 
-    def __init__(self, dsn='DEFAULT', parent=None, decorated_func=None):
+    def __init__(self, dsn='DEFAULT',
+                parent=None, _func_name=None, _func_module=None):
+
         self.dsn = dsn
         self._parent_sqlblk = parent
-        self._decorated_func = decorated_func
+        self._func_name = _func_name
+        self._func_module = _func_module
 
         self._cursor = RecordCursor(self)
         self._sqltext = SQLText()
@@ -212,20 +236,23 @@ class BaseSQLBlock:
         self._sqltext._join(sqltext, frame=sys._getframe(1))
         return self
 
-    async def execute(self, **parameters):
-        self._cursor._paramerters = parameters
+    async def execute(self, *sqltext, **params):
+        self._sqltext._join(*sqltext, frame=sys._getframe(1))
+
+        self._cursor._params = params
         await self._cursor.execute()
 
-    async def executemany(self, parameters_list):
-        self._cursor._paramerters = parameters_list
+    async def executemany(self, many_params, *sqltext):
+        self._sqltext._join(*sqltext, frame=sys._getframe(1))
+        self._cursor._many_params = many_params
         await self._cursor.execute()
 
     def __aiter__(self):
         return  self._cursor
 
     def __iter__(self):
-        if self._cursor._records is None:
-            raise Exception('before iterating, should wait for execute()')
+        # if self._cursor._records is None:
+        #     raise Exception('before iterating, should wait for execute()')
 
         return  self._cursor
 
@@ -249,9 +276,9 @@ class BaseSQLBlock:
 
     def __repr__(self):
 
-        if self._decorated_func:
-            func_str = f"against '{self._decorated_func.__name__}' "
-            func_str += f"in '{self._decorated_func.__module__}'"
+        if self._func_name:
+            func_str = f"against '{self._func_name}' "
+            func_str += f"in '{self._func_module}'"
         else:
             func_str = ""
 
@@ -284,10 +311,11 @@ class TransactionDecorator:
         _self_dsn = self.dsn
 
         def _decorator(func):
+            func_name, func_module = func.__name__, func.__module__
             func_sig = inspect.signature(func)
             if _self_dsn not in func_sig.parameters:
                 raise TypeError(f"The parameter '{_self_dsn}' is required "
-                                f" in {func.__name__} in {func.__module__}")
+                                f" in {func_name} in {func_module}")
 
             if _self_dsn.startswith('_dsn_'): # The referrence of dsn
                 _dsn_param = func_sig.parameters[_self_dsn]
@@ -296,11 +324,11 @@ class TransactionDecorator:
 
                     raise TypeError(f"The parameter '{_self_dsn}' should "
                                     f"declare that '{_self_dsn}=None' "
-                                    f"in {func.__name__} in {func.__module__} ")
-                newfunc = func
+                                    f"in {func_name} in {func_module} ")
+                func = func
             else: # The normal dsn
-                newfunc = functools.partial(func, **{_self_dsn: None})
-                functools.update_wrapper(newfunc, func)
+                func = functools.partial(func, **{_self_dsn: None})
+                # functools.update_wrapper(newfunc, func)
 
             async def _sqlblock_wrapper(*args, **kwargs):
                 if _self_dsn.startswith('_dsn_'):
@@ -314,7 +342,7 @@ class TransactionDecorator:
                                 raise ValueError(
                                     f"no found the parent sqlblock(dsn='{_dsn_var}')"
                                     f" against '{_self_dsn}' while calling"
-                                    f" '{newfunc.__name__}' of {newfunc.__module__}")
+                                    f" '{func_name}' of {func_module}")
                         else:
                             raise ValueError(
                                 f"Unknown the value of '{_self_dsn}'"
@@ -331,16 +359,17 @@ class TransactionDecorator:
 
                 __sqlblk_obj = BaseSQLBlock(dsn=_self_dsn,
                                             parent=_parent_sqlblk,
-                                            decorated_func=newfunc)
+                                            _func_name=func_name,
+                                            _func_module=func_module)
                 kwargs[_self_dsn] = __sqlblk_obj
 
                 await __sqlblk_obj.__enter__()
                 try:
-                    return await newfunc(*args, **kwargs)
+                    return await func(*args, **kwargs)
                 finally:
                     await __sqlblk_obj.__exit__(*sys.exc_info())
 
-            functools.update_wrapper(_sqlblock_wrapper, newfunc)
+            functools.update_wrapper(_sqlblock_wrapper, func)
             return _sqlblock_wrapper
 
         if len(d_args) == 1 and callable(d_args[0]): # no argument decorator

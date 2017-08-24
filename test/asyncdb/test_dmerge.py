@@ -10,20 +10,19 @@ from decimal import Decimal
 
 from domainics.domobj import dobject, datt, dset
 from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import set_dsn, transaction
+from domainics.asyncdb.sqlblock import set_dsn
+from domainics.asyncdb.sqlblock import transaction
+
 from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence
 from domainics.asyncdb.schema import DBSchema
 
+from domainics.asyncdb.dmerge import dmerge
+
 
 def setup_module(module):
     set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
-    module = inspect.getmodule(function)
 
-    schema = DBSchema()
-    schema.add_module(module)
-    schema.drop()
-    schema.create()
 
 class t_a(dtable):
     a = datt(int)
@@ -35,8 +34,12 @@ class t_a(dtable):
 
     __dobject_key__ = [a, b]
 
-@transaction.db(dsn='testdb')
-def test_dobject_dmerge():
+@transaction.testdb
+async def test_dmerge(testdb):
+    schema = DBSchema()
+    schema.add_module(inspect.getmodule(t_a))
+    await schema.drop()
+    await schema.create()
 
     # orginal data
     ASet = dset(t_a)
@@ -49,17 +52,32 @@ def test_dobject_dmerge():
 
     ds1 = A1Set(ds)
 
-    dmerge(ds1)
+    await dmerge(ds1)
 
-    db << "SELECT * FROM t_a"
-    ds0 = A1Set(dbc) # original
+    # return
+
+    await testdb.execute("SELECT * FROM t_a")
+    ds0 = A1Set(testdb) # original
     ds1 = A1Set(ds0) # to be modified
 
     ds1 += [t_a1(a=301, b=302, d=304, f=306)] # insert a new item
+
     ds1[t_a(a=101, b=102)].f = 5555 # update the first item
+
     del ds1[t_a(a=201, b=202)] # delete the 2nd item
 
     print('ORIGINAL:', ds0)
     print('MODIFIED:', ds1)
 
-    dmerge(ds1, ds0)
+    await dmerge(ds1, ds0)
+
+    await testdb.execute("SELECT * FROM t_a ORDER BY a,b")
+    ds2 = A1Set(testdb)
+    print("SELECTED:", ds2)
+
+    assert ds1[0] == ds2[0] and ds1[0].f == ds2[0].f
+    assert ds1[1] == ds2[1]
+
+
+import inspect
+print(inspect.signature(test_dmerge).parameters)

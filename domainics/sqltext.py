@@ -1,4 +1,5 @@
 import sys, string
+from collections.abc import Sequence, Mapping
 
 class SQLText:
     __tuple__ = ('_segments',)
@@ -73,7 +74,7 @@ class SQLText:
 
         return self
 
-    def get_statment(self, params=None):
+    def get_statment(self, *, params=None, many_params=None):
         sql_text = ''
 
 
@@ -89,18 +90,18 @@ class SQLText:
                 var_counter += 1
                 sql_text += f"${var_counter}"
 
-        if params is None or isinstance(params, dict):
-            return sql_text, eval_param_vals(params, placeholders), False
+        if many_params is None:
+            assert params is None or isinstance(params, Mapping)
 
-        elif isinstance(params, list):
-            sql_vals_list = []
-            params_list = params
-            for params in params_list:
-                sql_vals_list.append(eval_param_vals(params, placeholders))
+            return sql_text, eval_param_vals(params, placeholders)
+        else:
+            assert isinstance(many_params, Sequence)
 
-            return sql_text, sql_vals_list, True
+            many_sql_vals = []
+            for params in many_params:
+                many_sql_vals.append(eval_param_vals(params, placeholders))
 
-        return sql_text, sql_vals
+            return sql_text, many_sql_vals
 
     def __str__(self):
         return f"SQLText({str(self._segments)}])"
