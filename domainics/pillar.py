@@ -186,7 +186,10 @@ class History:
 
                     if exit_callback:
                         exc_type, exc_val, tb = sys.exc_info()
-                        exit_callback(exc_type, exc_val, tb)
+                        if iscoroutinefunction(exit_callback):
+                            await exit_callback(exc_type, exc_val, tb)
+                        else:
+                            exit_callback(exc_type, exc_val, tb)
 
                 return ret
 
@@ -244,7 +247,10 @@ class History:
                         exc_type, exc_val, tb = sys.exc_info()
                         exit_callback(exc_type, exc_val, tb)
 
+
             return _bound_func
+        else:
+            raise TypeError("Not Implemented")
 
 
 class PillarError(Exception):
