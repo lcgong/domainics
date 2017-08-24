@@ -25,6 +25,9 @@ def do_something(self, arg):
 import logging
 _logger = logging.getLogger(__name__)
 
+
+from inspect import Signature
+
 import sys, functools, inspect
 from itertools import chain as iter_chain
 
@@ -164,21 +167,21 @@ class RecordCursor:
             yield item_type(**obj)
 
 class BaseSQLBlock:
-    def __init__(self, dsn='DEFAULT', record_type=None):
+    __tuple__ = ('dsn', '_sqltext', '_cursor',
+                 '_parent_sqlblk', '_decorated_func')
 
-        # self._record_type = record_type or _default_record_type
-
+    def __init__(self, dsn='DEFAULT', parent=None, decorated_func=None):
         self.dsn = dsn
+        self._parent_sqlblk = parent
+        self._decorated_func = decorated_func
+
         self._cursor = RecordCursor(self)
         self._sqltext = SQLText()
 
-        self._outer_sqlblk = None # the outer sqlblock of nested function
-
 
     async def __enter__(self):
-        if self._outer_sqlblk:
-            print(123)
-            self._conn = self._outer_sqlblk._conn
+        if self._parent_sqlblk:
+            self._conn = self._parent_sqlblk._conn
             return self
 
         pool = await _get_pool(self.dsn)
@@ -190,7 +193,7 @@ class BaseSQLBlock:
         return self
 
     async def __exit__ (self, etyp, exc_val, tb):
-        if self._outer_sqlblk:
+        if self._parent_sqlblk:
             return False
 
         if exc_val :
@@ -244,44 +247,92 @@ class BaseSQLBlock:
         cur.execute(s, dict(seq=seq, cnt=batch_cnt))
         return (r[0] for r in  cur.fetchall())
 
-class TransactionDecorator:
+    def __repr__(self):
 
+        if self._decorated_func:
+            func_str = f"against '{self._decorated_func.__name__}' "
+            func_str += f"in '{self._decorated_func.__module__}'"
+        else:
+            func_str = ""
+
+        return f"<SQLBlock dsn='{self.dsn}' " + func_str +  f" at 0x{id(self):x}>"
+
+class TransactionDecoratorFactory:
     def __init__(self):
-        self.alias = None
+        self.dsn = None
 
-    def __getattr__(self, alias): # new decorator for a new alias
-        if self.alias is not None:
-            raise TypeError('the variable is defined: ' + self.alias)
+    def __getattr__(self, dsn):
+        return TransactionDecorator(dsn)
+        # if self.dsn is not None:
+        #     raise TypeError(f"tranaction decorator has already "
+        #                     f"set a dsn '{self.dsn}'")
 
-        transaction = TransactionDecorator()
-        transaction.alias = alias
+    def __call__(self, *args, kwargs):
+        raise TypeError(f"usage: such as 'transaction.db', 'db; is datasource name")
 
-        return transaction
 
-    def __call__(self, *d_args, dsn='DEFAULT'):
-        if self.alias is None:
-            raise TypeError('The connection variable name is required')
+class TransactionDecorator:
+    __tuple__ = ('dsn')
 
+    def __init__(self, dsn):
+        self.dsn = dsn
+
+    def __call__(self, *d_args):
+        if self.dsn is None:
+            raise TypeError('The dsn agasint this transaction is required')
+
+        _self_dsn = self.dsn
 
         def _decorator(func):
-
             func_sig = inspect.signature(func)
-            if self.alias not in func_sig.parameters:
-                raise TypeError(f"The argument '{self.alias}' should be declared"
+            if _self_dsn not in func_sig.parameters:
+                raise TypeError(f"The parameter '{_self_dsn}' is required "
                                 f" in {func.__name__} in {func.__module__}")
 
+            if _self_dsn.startswith('_dsn_'): # The referrence of dsn
+                _dsn_param = func_sig.parameters[_self_dsn]
+                if (_dsn_param.default is Signature.empty
+                    or _dsn_param.default is not None):
 
-
-            __sqlblk_obj = BaseSQLBlock(dsn=dsn)
-            __sqlblk_obj._alias = self.alias
-            newfunc = functools.partial(func, **{self.alias: __sqlblk_obj})
-
+                    raise TypeError(f"The parameter '{_self_dsn}' should "
+                                    f"declare that '{_self_dsn}=None' "
+                                    f"in {func.__name__} in {func.__module__} ")
+                newfunc = func
+            else: # The normal dsn
+                newfunc = functools.partial(func, **{_self_dsn: None})
+                functools.update_wrapper(newfunc, func)
 
             async def _sqlblock_wrapper(*args, **kwargs):
+                if _self_dsn.startswith('_dsn_'):
+                    _dsn_var = kwargs.get(_self_dsn)
+                    if _dsn_var is not None:
+                        if isinstance(_dsn_var, BaseSQLBlock):
+                            _parent_sqlblk = _dsn_var
+                        elif isinstance(_dsn_var, str):
+                            _parent_sqlblk = _find_parent_sqlblock(_dsn_var)
+                            if _parent_sqlblk is None:
+                                raise ValueError(
+                                    f"no found the parent sqlblock(dsn='{_dsn_var}')"
+                                    f" against '{_self_dsn}' while calling"
+                                    f" '{newfunc.__name__}' of {newfunc.__module__}")
+                        else:
+                            raise ValueError(
+                                f"Unknown the value of '{_self_dsn}'"
+                                f": {str(_dsn_var)}")
+                    else:
+                        _parent_sqlblk = _find_parent_sqlblock(None)
 
-                _outer_sqlblk = get_outer_sqlblock()
-                if _outer_sqlblk and _outer_sqlblk._alias == __sqlblk_obj._alias:
-                    __sqlblk_obj._outer_sqlblk = _outer_sqlblk
+                    if _parent_sqlblk is None:
+                        raise ValueError(f"Cannot find the parent sqlblock"
+                                         f"agasint '{_self_dsn}'. ")
+
+                else:
+                    _parent_sqlblk = _find_parent_sqlblock(_self_dsn)
+
+                __sqlblk_obj = BaseSQLBlock(dsn=_self_dsn,
+                                            parent=_parent_sqlblk,
+                                            decorated_func=newfunc)
+                kwargs[_self_dsn] = __sqlblk_obj
 
                 await __sqlblk_obj.__enter__()
                 try:
@@ -289,24 +340,22 @@ class TransactionDecorator:
                 finally:
                     await __sqlblk_obj.__exit__(*sys.exc_info())
 
-
             functools.update_wrapper(_sqlblock_wrapper, newfunc)
             return _sqlblock_wrapper
 
-        if len(d_args) == 1 and callable(d_args[0]):
-            # no argument decorator
+        if len(d_args) == 1 and callable(d_args[0]): # no argument decorator
             return _decorator(d_args[0])
         else:
             return _decorator
 
-def get_outer_sqlblock():
+def _find_parent_sqlblock(dsn):
     frame = sys._getframe(2)
     while frame:
         sqlblk = frame.f_locals.get('_TransactionDecorator__sqlblk_obj')
-        if sqlblk:
+        if sqlblk and (not dsn or sqlblk.dsn == dsn):
             return sqlblk
 
         frame = frame.f_back
     return None
 
-transaction = TransactionDecorator()
+transaction = TransactionDecoratorFactory()
