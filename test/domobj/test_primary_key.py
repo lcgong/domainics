@@ -2,14 +2,10 @@
 
 # -*- coding: utf-8 -*-
 
-import pytest
+import pytest, inspect
 from domainics.domobj import dobject, datt, dset
 
 from domainics.domobj.typing import PrimaryKeyTuple, AnyDObject
-
-def setup_module(module):
-    print()
-
 
 def test_primary_key():
     class I(dobject):
@@ -24,10 +20,8 @@ def test_primary_key():
     b = I(s = 1, n=2, x=5)
     assert a.__dobject_key__ == b.__dobject_key__
     assert hash(a.__dobject_key__) == hash(b.__dobject_key__)
-    assert isinstance(a.__dobject_key__, PrimaryKeyTuple[I])
-    assert issubclass(PrimaryKeyTuple[I], PrimaryKeyTuple[AnyDObject])
-    # assert isinstance(a.__dobject_key__, PrimaryKeyTuple[AnyDObject])
-    # some wrong in python 3.5, it's not transitive
+
+    assert isinstance(a.__dobject_key__, PrimaryKeyTuple)
 
     print(b)
 
