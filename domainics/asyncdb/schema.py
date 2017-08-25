@@ -4,20 +4,16 @@ import datetime
 from decimal import Decimal
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
-
-# from .. import json
-# from .sqlblock import transaction, dbc
-from .dtable import dtable, dsequence, json_object, DBArray
-from ..util     import iter_submodules
-from .sqlblock import set_dsn, transaction
-
-
-from ..domobj import dobject, dset, datt
-from domainics.sqltext import SQL
-
+from itertools import chain as iter_chain
 import textwrap
 
-from itertools import chain as iter_chain
+from sqlblock import SQL
+from sqlblock.asyncpg import set_dsn, transaction
+
+from .dtable import dtable, dsequence, json_object, DBArray
+from ..util import iter_submodules
+from ..domobj import dobject, dset, datt
+
 
 def repr_create_table(dobj_cls):
 

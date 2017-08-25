@@ -11,9 +11,8 @@ from itertools import chain as iter_chain
 from ..domobj import dset, DSetBase, dobject, reshape
 from .dtable import json_object, dtable, dsequence
 
-from .sqlblock import transaction
-
-from ..sqltext import SQL
+from sqlblock import SQL
+from sqlblock.asyncpg import transaction
 
 
 _EntryTuple = namedtuple('EntryTuple', ['pkey_attrs', 'pkey_values',

@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from itertools import chain as iter_chain
-from .sqlblock import transaction
 
+from sqlblock import SQL
+from sqlblock.asyncpg import transaction
 
 
 from ..domobj import DSetBase, DObject
 from ..db import dsequence
-from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import transaction
+
+
 
 @transaction._dsn_db
 def drecall(obj, present=False, _dsn_db=None):

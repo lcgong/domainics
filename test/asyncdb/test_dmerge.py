@@ -9,19 +9,14 @@ from datetime import datetime, date
 from decimal import Decimal
 
 from domainics.domobj import dobject, datt, dset
-from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import set_dsn
-from domainics.asyncdb.sqlblock import transaction
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence
 from domainics.asyncdb.schema import DBSchema
 
 from domainics.asyncdb.dmerge import dmerge
-
-#
-# def setup_module(module):
-#     set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
 
 
 class t_a(dtable):

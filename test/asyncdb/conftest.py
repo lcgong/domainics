@@ -4,12 +4,12 @@ import pytest
 import logging
 logging.basicConfig(format='[%(asctime)s %(levelname)s] %(message)s', datefmt="%M:%S", level=logging.DEBUG)
 
-from domainics.asyncdb.sqlblock import transaction
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 @pytest.fixture(scope='session')
 def setup_dsn():
-    from domainics.asyncdb.sqlblock import set_dsn
-
+    from sqlblock.asyncpg import set_dsn
     set_dsn(dsn='db', url="postgresql://postgres@localhost/test")
 
 

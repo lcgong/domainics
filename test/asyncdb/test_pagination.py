@@ -5,12 +5,12 @@ import inspect
 
 from domainics.domobj import DPage, DSet, dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence
-from domainics.asyncdb.sqlblock import transaction
 from domainics.asyncdb.schema import DBSchema
 from domainics.asyncdb.dmerge import dmerge
 from domainics.asyncdb.drecall import drecall
-from domainics.sqltext import SQL
 
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 class test_a(dtable):
     sn = datt(int)

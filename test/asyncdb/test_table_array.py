@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import transaction
+
 from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence, array, json_object
-
 from domainics.asyncdb.dmerge import dmerge
+
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 class t_a(dtable):
     a = datt(int)

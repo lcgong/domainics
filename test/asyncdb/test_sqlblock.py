@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from domainics.asyncdb.sqlblock import set_dsn, transaction
 from domainics.domobj import dobject, datt, dset
 
-from domainics.sqltext import SQL
-
-# def setup_module(module):
-#     set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 @pytest.mark.asyncio
 @transaction.db

@@ -1,16 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
-
-
 import pytest
-from domainics.asyncdb.sqlblock import set_dsn, transaction
-from domainics.domobj import dobject, datt, dset
 import inspect
+from domainics.domobj import dobject, datt, dset
 
-from domainics.sqltext import SQL
-
+from sqlblock.asyncpg import set_dsn, transaction
+from sqlblock import SQL
 
 def setup_module(module):
     set_dsn(dsn='db_a', url="postgresql://postgres@localhost/test")

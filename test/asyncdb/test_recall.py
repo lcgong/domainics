@@ -8,9 +8,9 @@ import inspect
 from datetime import datetime, date
 from decimal import Decimal
 
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 from domainics.domobj import dobject, datt, dset
-from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import set_dsn, transaction
 from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence
 

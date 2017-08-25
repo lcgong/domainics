@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
-
-
 import pytest
-from domainics.asyncdb.sqlblock import set_dsn, transaction
 from domainics.domobj import dobject, datt, dset
-from domainics.sqltext import SQL
 
+from sqlblock.asyncpg import transaction
+from sqlblock import SQL
 
 class Case:
     @transaction.db
