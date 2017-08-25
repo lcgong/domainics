@@ -44,10 +44,7 @@ setup(
     packages=find_packages("."),
     # package_dir = {"": "."},
     zip_safe = False,
-    install_requires = ["tornado>=4.2",
-                        "psycopg2>=2.6.1",
-                        "arrow>=0.6",
-                        "redbean>=0.1",
+    install_requires = ["redbean>=0.1",
                         "sqlblock>=0.1"],
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
