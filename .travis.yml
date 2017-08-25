@@ -11,7 +11,7 @@ ddons:
 install:
     - pip install .
 
-script: py.test -s
+script: py.test -sv
 
 before_script:
   - psql -h localhost -U postgres -c "CREATE DATABASE test WITH ENCODING='UTF8'"
