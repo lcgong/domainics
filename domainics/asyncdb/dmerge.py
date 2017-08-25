@@ -164,7 +164,7 @@ async def _do_insert(table_name, seq_attrs, dins, _dsn_db=None):
         dict(t for t in zip(cols, col_values))
         for col_values in values
     )
-    await _dsn_db.executemany(params_list)
+    await _dsn_db(params_list)
 
 async def _do_update(table_name, seq_attrs, dchg, _dsn_db=None):
     if seq_attrs:
@@ -198,7 +198,7 @@ async def _do_update(table_name, seq_attrs, dchg, _dsn_db=None):
             {{val_expr}}
         WHERE {{pk_expr}}
         """
-        await _dsn_db.execute(**params)
+        await _dsn_db(**params)
 
 async def _do_delete(table_name, ddel, _dsn_db=None):
     values = []
@@ -212,7 +212,7 @@ async def _do_delete(table_name, ddel, _dsn_db=None):
     _dsn_db << f"""
     DELETE FROM {table_name} WHERE {{pk_expr}}
     """
-    await _dsn_db.executemany(values)
+    await _dsn_db(values)
 
 
 def allocate_sequence(attr, seq_values):

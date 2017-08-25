@@ -15,13 +15,6 @@ from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence, array, json_object
 from domainics.asyncdb.schema import DBSchema
 
-
-# from domainics.asyncdb import , , , , dmerge, drecall
-#
-# def setup_module(module):
-#     set_dsn(dsn='dba', url="postgresql://postgres@localhost/test")
-#
-
 class t_a(dtable):
     a = datt(int)
     b = datt(array(str, dimensions=1))

@@ -35,7 +35,7 @@ async def test_case2(db, module_dtables):
     await dmerge(ds1)
 
     print('----------------')
-    await db.execute("SELECT * FROM test_a")
+    await (db << "SELECT * FROM test_a")
     async for r in db:
         print(r)
     print('+++++++++++++++')

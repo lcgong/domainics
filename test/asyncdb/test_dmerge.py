@@ -57,7 +57,9 @@ async def test_dmerge(db, module_dtables):
 
     # return
 
-    await db.execute("SELECT * FROM t_a")
+    db << "SELECT * FROM t_a"
+    await db
+
     ds0 = A1Set(db) # original
     ds1 = A1Set(ds0) # to be modified
 
@@ -72,8 +74,8 @@ async def test_dmerge(db, module_dtables):
 
     await dmerge(ds1, ds0)
 
-    await db.execute("SELECT * FROM t_a ORDER BY a,b")
-    ds2 = A1Set(db)
+    SQL("SELECT * FROM t_a ORDER BY a,b") >> db
+    ds2 = A1Set(await db)
     print("SELECTED:", ds2)
 
     assert ds1[0] == ds2[0] and ds1[0].f == ds2[0].f

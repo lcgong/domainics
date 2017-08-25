@@ -28,8 +28,7 @@ async def test_array(db, module_dtables):
 
     await dmerge(s1)
 
-    db << "SELECT * FROM t_a ORDER BY a"
-    await db.execute()
+    await (db << "SELECT * FROM t_a ORDER BY a")
 
     s2 = ASet(db)
     assert s2[0].b == ['a', 'b']

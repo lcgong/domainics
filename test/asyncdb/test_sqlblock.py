@@ -68,7 +68,7 @@ async def test_func1(db, event_loop):
     db << """\
     DROP TABLE IF EXISTS test_123
     """
-    await db.execute()
+    await db
 
     #
     db << """\
@@ -77,25 +77,25 @@ async def test_func1(db, event_loop):
         name TEXT
     )
     """
-    await db.execute()
+    await db
 
     data = [(1, 'a'), (2, 'b'), (3, 'c')]
     table_name = "test_123"
     for sn, name in data:
         db << f"INSERT INTO {table_name} (sn, name) VALUES ({{sn}}, {{name}})"
         # dbconn << f""
-        await db.execute()
+        await db
 
     data = [{"sn":4, "name":'d'}, {"sn":5, "name":'e'}, {"sn":6, "name":'f'}]
     db << "INSERT INTO test_123 (sn, name) VALUES ({sn}, {name})"
-    await db.executemany(data)
+    await db(data)
 
     db << SQL('SELECT sn, name FROM test_123;')
     async for r in db:
         print(r)
 
     db << SQL('SELECT sn, name FROM test_123')
-    await db.execute()
+    await db
     for r in db:
         print(r)
 
@@ -105,7 +105,7 @@ async def test_func1(db, event_loop):
         __dobject_key__ = [sn]
 
     db << SQL('SELECT sn, name FROM test_123')
-    await db.execute()
+    await db
 
     BSet = dset(B)
     bset = BSet(db)

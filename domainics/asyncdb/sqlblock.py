@@ -254,18 +254,6 @@ class BaseSQLBlock:
             self._cursor._many_params = many_params[0]
             await self._cursor.execute()
 
-
-    async def execute(self, *sqltext, **params):
-        self._sqltext._join(*sqltext, frame=sys._getframe(1))
-
-        self._cursor._params = params
-        await self._cursor.execute()
-
-    async def executemany(self, many_params, *sqltext):
-        self._sqltext._join(*sqltext, frame=sys._getframe(1))
-        self._cursor._many_params = many_params
-        await self._cursor.execute()
-
     def __aiter__(self):
         return  self._cursor
 
@@ -281,18 +269,6 @@ class BaseSQLBlock:
             return self._cursor.__dset__(item_type)
 
         return dset(item_type)()
-
-    def nextval(self, seq, batch_cnt=None):
-        cur = self._cursor
-        if batch_cnt is None :
-            s = "SELECT nextval(%(seq)s)"
-            cur.execute(s, dict(seq=seq))
-            row = next(cur.fetchall())
-            return row[0] if row is not None else None
-
-        s = "SELECT nextval(%(seq)s) FROM generate_series(1, %(cnt)s) s"
-        cur.execute(s, dict(seq=seq, cnt=batch_cnt))
-        return (r[0] for r in  cur.fetchall())
 
     def __repr__(self):
 

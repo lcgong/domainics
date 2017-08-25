@@ -52,8 +52,8 @@ async def test_recall2(db, module_dtables):
     ds1 += [t_b(b=12, c=13, d= 14), t_b(b=22, c=23, d=24)]
     await dmerge(ds1)
 
-    db << ('SELECT 1 as sn FROM t_b')
-    await db.execute()
+    db << 'SELECT 1 as sn FROM t_b'
+    await db
 
     ds2 = ASet(a=2)
     print(333, ds2)

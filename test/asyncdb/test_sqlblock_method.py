@@ -14,7 +14,7 @@ class Case:
     @transaction.db
     async def get_data(self, db):
         db << "SELECT 1 as sn, 'a' as name"
-        await db.execute()
+        await db
         return list(db)
 
 @pytest.mark.asyncio

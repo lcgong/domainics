@@ -13,6 +13,7 @@ from .sqlblock import set_dsn, transaction
 
 
 from ..domobj import dobject, dset, datt
+from domainics.sqltext import SQL
 
 import textwrap
 
@@ -224,12 +225,16 @@ class DBSchema:
                 if issubclass(db_cls, dtable):
                     seen.add(cls_name)
                     for stmt in repr_create_table(db_cls):
-                        await _dsn_db.execute(stmt)
+                        SQL(stmt) >> _dsn_db
+                        await _dsn_db
+                        # await _dsn_db.execute(stmt)
 
                 elif issubclass(db_cls, dsequence):
                     seen.add(cls_name)
                     for stmt in repr_create_sequence(db_cls):
-                        await _dsn_db.execute(stmt)
+                        SQL(stmt) >> _dsn_db
+                        await _dsn_db
+                        # await _dsn_db.execute(stmt)
 
             except Exception as ex:
                 errmsg = 'caught exception while scheming %s (%r)'
@@ -253,9 +258,13 @@ class DBSchema:
             if issubclass(db_cls, dtable):
                 seen.add(db_cls)
                 for stmt in repr_drop_table(db_cls):
-                    await _dsn_db.execute(stmt)
+                    SQL(stmt) >> _dsn_db
+                    await _dsn_db
+                    # await _dsn_db.execute(stmt)
 
             elif issubclass(db_cls, dsequence):
                 seen.add(db_cls)
                 for stmt in repr_drop_sequence(db_cls):
-                    await _dsn_db.execute(stmt)
+                    SQL(stmt) >> _dsn_db
+                    await _dsn_db
+                    # await _dsn_db.execute(stmt)

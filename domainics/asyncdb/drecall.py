@@ -118,4 +118,4 @@ async def _select_with_pks(table_name, col_names, pk_pairs, _page=None, _dsn_db=
     {{where_part}}
     {{page_part}}
     """
-    await _dsn_db.execute(**pk_pairs)
+    await _dsn_db(**pk_pairs)
