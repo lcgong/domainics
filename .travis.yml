@@ -1,16 +1,18 @@
 language: python
 python:
   - "3.6"
-  - "nightly"
+  - "3.7"
 
-addons:
-  postgresql: "9.5"
+services:
+  - postgresql
+
+ddons:
+  postgresql: "9.6"
 
 install:
     - pip install .
 
 script: py.test -s
 
-
 before_script:
-  - psql -h localhost -c "CREATE DATABASE test WITH ENCODING='UTF8'" -U postgres
+  - psql -h localhost -U postgres -c "CREATE DATABASE test WITH ENCODING='UTF8'"
