@@ -44,7 +44,7 @@ setup(
     packages=find_packages("."),
     # package_dir = {"": "."},
     zip_safe = False,
-    install_requires = ["arrow>=0.10"
+    install_requires = ["arrow>=0.10",
                         "redbean>=0.1",
                         "sqlblock>=0.1"],
     classifiers = [
