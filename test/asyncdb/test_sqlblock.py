@@ -11,6 +11,53 @@ from domainics.sqltext import SQL
 
 @pytest.mark.asyncio
 @transaction.db
+async def test_func_rshift(db, event_loop):
+    SQL("""
+    SELECT 1 as sn, 'tom' as name
+    """) >> db
+    await db
+    for r in db: print(r)
+
+    SQL("""
+    SELECT 1 as sn, 'tom' as name
+    """) >> db
+    for r in await db: print(r)
+
+    SQL("""
+    SELECT 1 as sn, 'tom' as name
+    """) >> db
+    async for r in db: print(r)
+
+    sn = 10
+    SQL("""
+    SELECT {sn}::integer as sn, 'tom' as name
+    """) >> db
+    await db
+
+    SQL("""
+    SELECT {sn}::integer as sn, 'tom' as name
+    """) >> db
+    await db(sn=20)
+
+
+    SQL("""
+    SELECT {sn}::integer as sn, 'tom' as name
+    """) >> db
+    await db([dict(sn=200), dict(sn=201)])
+
+@pytest.mark.asyncio
+@transaction.db
+async def test_func_rshift_exc1(db, event_loop):
+    SQL("""
+    SELECT 1 as sn, 'tom' as name
+    """) >> db
+    # await db
+    with pytest.raises(ValueError): # need to await db
+        for r in db:
+            print(r)
+
+@pytest.mark.asyncio
+@transaction.db
 async def test_func1(db, event_loop):
     db << """\
     SELECT 1 as name

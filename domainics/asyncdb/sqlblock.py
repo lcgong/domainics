@@ -235,6 +235,26 @@ class BaseSQLBlock:
         self._sqltext._join(sqltext, frame=sys._getframe(1))
         return self
 
+    def __await__(self):
+        return self.__call__().__await__()
+
+    async def __call__(self, *many_params, **params):
+        """
+        db(param1=1, param2=2, .... )
+        executemany:
+            db([dict(param1=1, param2=2, ..), dict(), ...])
+        """
+        if not many_params:
+            self._cursor._params = params
+            await self._cursor.execute()
+            return self
+        else:
+            assert len(many_params) == 1
+
+            self._cursor._many_params = many_params[0]
+            await self._cursor.execute()
+
+
     async def execute(self, *sqltext, **params):
         self._sqltext._join(*sqltext, frame=sys._getframe(1))
 
@@ -250,6 +270,10 @@ class BaseSQLBlock:
         return  self._cursor
 
     def __iter__(self):
+        if self._sqltext:
+            self._sqltext.clear()
+            raise ValueError(f"There is a sqltext need to 'await {self.dsn}'")
+
         return  self._cursor
 
     def __dset__(self, item_type):

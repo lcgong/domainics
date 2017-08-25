@@ -40,6 +40,14 @@ class SQLText:
 
         return self
 
+    def __rshift__(self, sqlblock):
+        if hasattr(sqlblock, '__lshift__'):
+            # sqlblock._sqltext.clear()
+            sqlblock.__lshift__(self)
+            return sqlblock
+
+        raise ValueError("SQL(' ') >> sqlblock")
+
     def _join(self, *sqltexts, sep='', frame=sys._getframe(1)):
         if not sqltexts: return
 
@@ -74,6 +82,9 @@ class SQLText:
 
         return self
 
+    def clear(self):
+        self._segments = []
+
     def get_statment(self, *, params=None, many_params=None):
         sql_text = ''
 
@@ -101,7 +112,7 @@ class SQLText:
             for params in many_params:
                 many_sql_vals.append(eval_param_vals(params, placeholders))
 
-            return sql_text, many_sql_vals
+            return sql_text + ";", many_sql_vals
 
     def __str__(self):
         return f"SQLText({str(self._segments)}])"

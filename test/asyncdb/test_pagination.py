@@ -3,28 +3,13 @@
 import pytest
 import inspect
 
-# from domainics.tornice import rest, route_base
-# from domainics.tornice.client import rest_client, restcli
-
 from domainics.domobj import DPage, DSet, dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence
 from domainics.asyncdb.sqlblock import transaction
 from domainics.asyncdb.schema import DBSchema
-from domainics.sqltext import SQL
 from domainics.asyncdb.dmerge import dmerge
 from domainics.asyncdb.drecall import drecall
-
-
-# set_dsn(sys='postgres', database="ci_test", host='localhost', user='dbo')
-#
-# def setup_function(function):
-#     print()
-#     module = inspect.getmodule(function)
-#
-#     schema = DBSchema()
-#     schema.add_module(module)
-#     schema.drop()
-#     schema.create()
+from domainics.sqltext import SQL
 
 
 class test_a(dtable):
