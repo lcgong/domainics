@@ -442,7 +442,7 @@ class DSetBaseImpl(DSetBase, dobject):
 
     def __iadd__(self, value) :
 
-        if isinstance(value, (DSet[DObject], Iterable)):
+        if isinstance(value, (DSet, Iterable)):
             for obj in value:
                 self._add(obj)
         elif isinstance(value, DObject):
