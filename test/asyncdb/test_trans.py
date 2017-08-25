@@ -12,34 +12,29 @@ from domainics.sqltext import SQL
 
 
 def setup_module(module):
-    set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
+    set_dsn(dsn='db2', url="postgresql://postgres@localhost/test")
 
 
-@transaction.db(dsn='testdb')
+@transaction.db
 async def func1(db):
-    db << "SELECT 10 as sn"
-    await db.execute()
+    await db.execute("SELECT 10 as sn")
 
-    db << "SELECT 11 as sn"
-    await db.execute()
+    await db.execute("SELECT 11 as sn")
 
     await func2()
 
-    db << "SELECT 12 as sn"
-    await db.execute()
+    await db.execute("SELECT 12 as sn")
 
-import sys
-@transaction.db1(dsn='testdb')
-async def func2(db1):
+@transaction.db
+async def func2(db):
+    await db.execute("SELECT 21 as sn")
 
-    db1 << "SELECT 21 as sn"
-    await db1.execute()
+    await func3()
 
-@transaction.db(dsn='testdb')
-async def func3(db):
+@transaction.db2
+async def func3(db2):
+    await db2.execute("SELECT 31 as sn")
 
-    db << "SELECT 31 as sn"
-    await db.execute()
-
+@pytest.mark.asyncio
 async def test_trans():
     await func1()

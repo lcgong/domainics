@@ -35,7 +35,7 @@ def test_sqltext2():
     with pytest.raises(NameError):
         stmt, vals = s.get_statment()
 
-    stmt, vals = s.get_statment(dict(b=10, c=20, g=30))
+    stmt, vals = s.get_statment(params=dict(b=10, c=20, g=30))
     assert stmt == '$1$2$3[$4$5]'
 
     assert vals[4] == 31

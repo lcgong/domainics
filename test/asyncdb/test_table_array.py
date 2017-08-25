@@ -1,30 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-
-from datetime import datetime, date
-from decimal import Decimal
-
-import logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
-
-import inspect
 from domainics.sqltext import SQL
-from domainics.asyncdb.sqlblock import set_dsn, transaction
+from domainics.asyncdb.sqlblock import transaction
 from domainics.domobj import dobject, datt, dset
 from domainics.asyncdb.dtable import dtable, dsequence, array, json_object
-from domainics.asyncdb.schema import DBSchema
 
-
-set_dsn(dsn='dba', url="postgresql://postgres@localhost/test")
-
-async def setup_module(module):
-
-    schema = DBSchema()
-    schema.add_module(module)
-    await schema.drop()
-    await schema.create()
-
+from domainics.asyncdb.dmerge import dmerge
 
 class t_a(dtable):
     a = datt(int)
@@ -32,9 +14,9 @@ class t_a(dtable):
 
     __dobject_key__ = [a]
 
-
-@transaction.db(dsn='dba')
-def test_array(db):
+@pytest.mark.asyncio
+@transaction.db
+async def test_array(db, module_dtables):
 
     ASet = dset(t_a)
     s1 = ASet()
@@ -44,10 +26,12 @@ def test_array(db):
     s1[0].b = ['a', 'b']
     assert s1[0].b == ['a', 'b']
 
-    dmerge(s1)
+    await dmerge(s1)
 
     db << "SELECT * FROM t_a ORDER BY a"
-    s2 = ASet(dbc)
+    await db.execute()
+
+    s2 = ASet(db)
     assert s2[0].b == ['a', 'b']
 
     print(s2)

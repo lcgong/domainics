@@ -38,8 +38,10 @@ async def sub_func1(parent_db, _dsn_db=None):
 
     assert _dsn_db._conn is _dsn_db._parent_sqlblk._conn
 
+
+@pytest.mark.asyncio
 async def test_trans():
     func_sign = inspect.signature(func1)
     print(func_sign)
-     
+
     await func1()

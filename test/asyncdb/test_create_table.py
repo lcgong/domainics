@@ -17,10 +17,10 @@ from domainics.asyncdb.schema import DBSchema
 
 
 # from domainics.asyncdb import , , , , dmerge, drecall
-
-def setup_module(module):
-    set_dsn(dsn='dba', url="postgresql://postgres@localhost/test")
-
+#
+# def setup_module(module):
+#     set_dsn(dsn='dba', url="postgresql://postgres@localhost/test")
+#
 
 class t_a(dtable):
     a = datt(int)
@@ -28,8 +28,9 @@ class t_a(dtable):
 
     __dobject_key__ = [a]
 
-@transaction.db(dsn="dba")
-async def test_array(db):
+@pytest.mark.asyncio
+@transaction.db
+async def test_array(db, setup_dsn):
 
     module = inspect.getmodule(t_a)
 

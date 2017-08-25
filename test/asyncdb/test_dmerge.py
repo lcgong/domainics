@@ -19,9 +19,9 @@ from domainics.asyncdb.schema import DBSchema
 
 from domainics.asyncdb.dmerge import dmerge
 
-
-def setup_module(module):
-    set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
+#
+# def setup_module(module):
+#     set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
 
 
 class t_a(dtable):
@@ -34,12 +34,13 @@ class t_a(dtable):
 
     __dobject_key__ = [a, b]
 
-@transaction.testdb
-async def test_dmerge(testdb):
-    schema = DBSchema()
-    schema.add_module(inspect.getmodule(t_a))
-    await schema.drop()
-    await schema.create()
+@pytest.mark.asyncio
+@transaction.db
+async def test_dmerge(db, module_dtables):
+    # schema = DBSchema()
+    # schema.add_module(inspect.getmodule(t_a))
+    # await schema.drop()
+    # await schema.create()
 
     # orginal data
     ASet = dset(t_a)
@@ -56,8 +57,8 @@ async def test_dmerge(testdb):
 
     # return
 
-    await testdb.execute("SELECT * FROM t_a")
-    ds0 = A1Set(testdb) # original
+    await db.execute("SELECT * FROM t_a")
+    ds0 = A1Set(db) # original
     ds1 = A1Set(ds0) # to be modified
 
     ds1 += [t_a1(a=301, b=302, d=304, f=306)] # insert a new item
@@ -71,13 +72,13 @@ async def test_dmerge(testdb):
 
     await dmerge(ds1, ds0)
 
-    await testdb.execute("SELECT * FROM t_a ORDER BY a,b")
-    ds2 = A1Set(testdb)
+    await db.execute("SELECT * FROM t_a ORDER BY a,b")
+    ds2 = A1Set(db)
     print("SELECTED:", ds2)
 
     assert ds1[0] == ds2[0] and ds1[0].f == ds2[0].f
     assert ds1[1] == ds2[1]
 
 
-import inspect
-print(inspect.signature(test_dmerge).parameters)
+# import inspect
+# print(inspect.signature(test_dmerge).parameters)

@@ -191,7 +191,7 @@ async def _do_update(table_name, seq_attrs, dchg, _dsn_db=None):
             params[f] = v[0]
 
         chg_attrs = list(dchg.values[i].keys())
-        val_expr = SQL(*(f"{n}={{{n}}}" for n in chg_attrs), sep=' AND ')
+        val_expr = SQL(*(f"{n}={{{n}}}" for n in chg_attrs), sep=', ')
 
         _dsn_db << f"""
         UPDATE {table_name} SET

@@ -258,8 +258,7 @@ class DSetBaseImpl(DSetBase, dobject):
         dset_cls = self.__class__
         item_cls = self.__dset_item_class__
 
-        subst_mapping = getattr(dset_cls, '_dobject_subst_mapping', None)
-
+        subst_mapping = getattr(self, '_dobject_subst_mapping', None)
         if subst_mapping is not None:
             return subst_mapping
 
@@ -285,7 +284,9 @@ class DSetBaseImpl(DSetBase, dobject):
                                 for item_attr_name, dset_attr_name
                                     in subst_mapping)
 
-        setattr(dset_cls, '_dobject_subst_mapping', subst_values)
+        # setattr(self, '_dobject_subst_mapping', subst_values)
+        instance_setter = super(dobject, self).__setattr__
+        instance_setter('_dobject_subst_mapping', subst_values)
 
         return subst_values
 

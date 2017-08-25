@@ -110,10 +110,13 @@ class RecordCursor:
         if not sql_stmt:
             return
 
-        # print(sql_stmt, sql_vals)
+        try:
+            stmt = await self._sqlblock._conn.prepare(sql_stmt)
+            records = await stmt.fetch(*sql_vals)
+        except Exception as exc:
+            _logger.debug(f"{str(exc):}\nSQL: {sql_stmt}\nPARAMS: {sql_vals}")
+            raise
 
-        stmt = await self._sqlblock._conn.prepare(sql_stmt)
-        records = await stmt.fetch(*sql_vals)
         if not records:
             self._idx = -1
             self._attr_names = None
@@ -129,14 +132,13 @@ class RecordCursor:
         self._n_records = len(records)
         self._idx = 0
 
-    def __aiter__(self):
-        return self
-
     async def __anext__(self):
         if self._sqlblock._sqltext:
             await self.execute()
-
         idx = self._idx
+        if idx is None:
+            raise StopAsyncIteration()
+
         if idx < 0 or idx >= self._n_records:
             self._idx = None
             self._records = None
@@ -146,9 +148,6 @@ class RecordCursor:
 
         self._idx += 1
         return self._record_type(*self._records[idx])
-
-    def __iter__(self):
-        return self
 
     def __next__(self):
         if self._idx is None:
@@ -251,9 +250,6 @@ class BaseSQLBlock:
         return  self._cursor
 
     def __iter__(self):
-        # if self._cursor._records is None:
-        #     raise Exception('before iterating, should wait for execute()')
-
         return  self._cursor
 
     def __dset__(self, item_type):

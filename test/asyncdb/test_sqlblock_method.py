@@ -10,17 +10,14 @@ from domainics.domobj import dobject, datt, dset
 from domainics.sqltext import SQL
 
 
-def setup_module(module):
-    set_dsn(dsn='testdb', url="postgresql://postgres@localhost/test")
-
 class Case:
-    @transaction.db(dsn='testdb')
+    @transaction.db
     async def get_data(self, db):
         db << "SELECT 1 as sn, 'a' as name"
         await db.execute()
         return list(db)
 
-@pytest.fixture
+@pytest.mark.asyncio
 async def test_method(event_loop):
 
     c = Case()
