@@ -4,7 +4,7 @@ python:
   - "nightly"
 
 addons:
-  postgresql: "9.6"
+  postgresql: "9.5"
 
 install:
     - pip install .
