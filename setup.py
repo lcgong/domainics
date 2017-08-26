@@ -35,7 +35,7 @@ class PyTest(TestCommand):
 
 setup(
     name='domainics',
-    version='0.3.5',
+    version='0.4.0',
     license="BSD",
     description='Web Framwork with Domain-orieted architecure',
     author='Chenggong Lyu',
